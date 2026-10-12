@@ -49,3 +49,6 @@ venv/
 .idea
 .DS_Store
 ._*
+
+# Vend plugin, including the ESP32 sketch, is published from the org plugins repo.
+/vend_plugin/

@@ -6,8 +6,8 @@ resolver = "2"
 version = "0.8.12"
 edition = "2024"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/tsmboa0/kinetic-vm"
-homepage = "https://github.com/tsmboa0/kinetic-vm"
+repository = "https://github.com/kineticVM-labs/kinetic-vm"
+homepage = "https://github.com/kineticVM-labs/kinetic-vm"
 rust-version = "1.96.0"
 
 [workspace.dependencies]
@@ -50,7 +50,7 @@ license.workspace = true
 description = "Zero overhead. Zero compromise. 100% Rust. The fastest, smallest AI assistant."
 repository.workspace = true
 homepage.workspace = true
-documentation = "https://github.com/tsmboa0/kinetic-vm"
+documentation = "https://github.com/kineticVM-labs/kinetic-vm"
 readme = "README.md"
 keywords = ["ai", "agent", "cli", "assistant", "chatbot"]
 categories = ["command-line-utilities", "api-bindings"]

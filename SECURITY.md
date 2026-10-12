@@ -6,7 +6,7 @@ Do not open a public GitHub issue for a security vulnerability.
 
 Report it through GitHub private vulnerability reporting on this repository:
 
-https://github.com/tsmboa0/kinetic-vm/security/advisories/new
+https://github.com/kineticVM-labs/kinetic-vm/security/advisories/new
 
 There is no separate security email yet. Please include:
 

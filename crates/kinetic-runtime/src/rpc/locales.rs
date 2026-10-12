@@ -123,7 +123,7 @@ pub async fn handle_locales_fetch(
             let mut content: Option<String> = None;
             for git_ref in &refs {
                 let url = format!(
-                    "https://raw.githubusercontent.com/tsmboa0/kinetic-vm/{git_ref}/{repo_path}"
+                    "https://raw.githubusercontent.com/kineticVM-labs/kinetic-vm/{git_ref}/{repo_path}"
                 );
                 let resp = match client.get(&url).send().await {
                     Ok(r) => r,

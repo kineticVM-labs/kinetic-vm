@@ -12,7 +12,7 @@ use sha2::{Digest, Sha256};
 
 use crate::i18n::{get_required_cli_string, get_required_cli_string_with_args};
 
-const DEFAULT_REPO: &str = "tsmboa0/kinetic-vm";
+const DEFAULT_REPO: &str = "kineticVM-labs/kinetic-vm";
 
 /// What `kinetic update` found.
 #[derive(Debug, PartialEq, Eq)]

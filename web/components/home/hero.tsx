@@ -8,7 +8,7 @@ import { EASE_OUT } from "@/components/home/reveal";
 import { ArrowRight } from "@/components/icons";
 import { links } from "@/lib/links";
 
-const INSTALL = "curl -fsSL https://raw.githubusercontent.com/tsmboa0/kinetic-vm/main/install.sh | sh";
+const INSTALL = "curl -fsSL https://raw.githubusercontent.com/kineticVM-labs/kinetic-vm/main/install.sh | sh";
 
 const container: Variants = {
   hidden: {},

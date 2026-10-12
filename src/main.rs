@@ -4238,7 +4238,7 @@ async fn fetch_locales(locale: &str, catalog: Option<&str>) -> Result<()> {
         let mut body: Option<String> = None;
         for git_ref in &refs {
             let url = format!(
-                "https://raw.githubusercontent.com/tsmboa0/kinetic-vm/{git_ref}/{repo_path}"
+                "https://raw.githubusercontent.com/kineticVM-labs/kinetic-vm/{git_ref}/{repo_path}"
             );
             let resp = client.get(&url).send().await?;
             if resp.status().is_success() {
@@ -7658,7 +7658,7 @@ Add pricing to the active provider profile or supply a catalog entry."
             // The marketing download page is not live; point at the GitHub
             // releases page, which hosts the desktop download assets (.deb /
             // .AppImage / .dmg) for the latest release.
-            let download_url = "https://github.com/tsmboa0/kinetic-vm/releases/latest";
+            let download_url = "https://github.com/kineticVM-labs/kinetic-vm/releases/latest";
 
             if do_install {
                 println!(

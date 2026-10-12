@@ -1,7 +1,7 @@
 #!/bin/sh
 # Install a published KineticVM binary.
 #
-#   curl -fsSL https://raw.githubusercontent.com/tsmboa0/kinetic-vm/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/kineticVM-labs/kinetic-vm/main/install.sh | sh
 #
 # The binary lands in ~/.local/bin unless KINETIC_INSTALL_DIR is set.
 # KINETIC_VERSION pins a tag (default: latest). KINETIC_REPO overrides the
@@ -9,7 +9,7 @@
 
 set -eu
 
-repo="${KINETIC_REPO:-tsmboa0/kinetic-vm}"
+repo="${KINETIC_REPO:-kineticVM-labs/kinetic-vm}"
 version="${KINETIC_VERSION:-latest}"
 
 resolve_target() {

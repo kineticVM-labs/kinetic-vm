@@ -1,5 +1,7 @@
 # KineticVM
 
+![KineticVM](web/public/og-home.png)
+
 KineticVM gives a physical AI device a Monad identity (ERC-8004), an
 owner-controlled wallet with spending limits, and a signed attestation of
 what its actuators do. The owner holds the identity. The device holds a
@@ -19,7 +21,7 @@ the channels it listens on, and the hardware adapters.
 Linux (64-bit, including Raspberry Pi) and macOS:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tsmboa0/kinetic-vm/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/kineticVM-labs/kinetic-vm/main/install.sh | sh
 ```
 
 This puts the latest release binary in `~/.local/bin`. Then run `kinetic quickstart`.

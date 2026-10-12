@@ -37,7 +37,7 @@ expect_fail Windows x86_64
 
 dry=$(KINETIC_OS=Linux KINETIC_ARCH=aarch64 KINETIC_INSTALL_DIR=/tmp/kinetic-bin KINETIC_INSTALL_DRY_RUN=1 sh "$install")
 printf '%s\n' "$dry" | grep -q 'target=aarch64-unknown-linux-gnu'
-printf '%s\n' "$dry" | grep -q 'url=https://github.com/tsmboa0/kinetic-vm/releases/latest/download/kinetic-aarch64-unknown-linux-gnu.tar.gz'
+printf '%s\n' "$dry" | grep -q 'url=https://github.com/kineticVM-labs/kinetic-vm/releases/latest/download/kinetic-aarch64-unknown-linux-gnu.tar.gz'
 printf '%s\n' "$dry" | grep -q 'dest=/tmp/kinetic-bin'
 
 echo "install.sh target selection passed"

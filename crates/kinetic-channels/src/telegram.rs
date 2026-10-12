@@ -5985,12 +5985,16 @@ Allowlist Telegram username (without '@') or numeric user ID.",
             }
 
             let text = format_telegram_text_chunk(chunk, index, chunks.len());
+            let wallet_buttons = kinetic_runtime::claim_watch::wallet_keyboard_for_message(&text);
 
             let mut markdown_body = serde_json::json!({
                 "chat_id": chat_id,
                 "text": Self::markdown_to_telegram_html(&text),
                 "parse_mode": "HTML"
             });
+            if let Some(markup) = &wallet_buttons {
+                markdown_body["reply_markup"] = markup.clone();
+            }
 
             // Add message_thread_id for forum topic support
             if let Some(tid) = thread_id {
@@ -6029,6 +6033,9 @@ Allowlist Telegram username (without '@') or numeric user ID.",
                 "chat_id": chat_id,
                 "text": text,
             });
+            if let Some(markup) = wallet_buttons {
+                plain_body["reply_markup"] = markup;
+            }
 
             // Add message_thread_id for forum topic support
             if let Some(tid) = thread_id {
@@ -10432,6 +10439,62 @@ mod tests {
                 .sent_text,
             "Searching the docs..."
         );
+    }
+
+    /// A vault or claim page in an agent reply gets the same two buttons as
+    /// the claim note. A reply with no wallet page stays a plain message.
+    #[tokio::test]
+    async fn send_text_chunks_attaches_wallet_buttons_for_a_vault_page() {
+        use wiremock::matchers::{method, path_regex};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let page = "https://vault-deposit.kineticvm.xyz?address=0x77102fCAC7927bB64507DF82bf1ae659465B4EE5&agent=12";
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path_regex(r"/bot[^/]+/sendMessage$"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(
+                    serde_json::json!({ "ok": true, "result": { "message_id": 1 } }),
+                ),
+            )
+            .expect(2)
+            .mount(&mock_server)
+            .await;
+
+        let channel =
+            multi_message_test_channel("telegram_test_alias", 0).with_api_base(mock_server.uri());
+        channel
+            .send_text_chunks(
+                &format!("Cola is 1.5 MON. Pay here: {page}"),
+                "100",
+                None,
+                0,
+            )
+            .await
+            .unwrap();
+        channel
+            .send_text_chunks("Your code is 5435.", "100", None, 0)
+            .await
+            .unwrap();
+
+        let requests = mock_server.received_requests().await.unwrap();
+        assert_eq!(requests.len(), 2);
+        let paid: serde_json::Value = serde_json::from_slice(&requests[0].body).unwrap();
+        let rows = paid["reply_markup"]["inline_keyboard"]
+            .as_array()
+            .expect("buttons");
+        assert_eq!(rows[0][0]["text"], "Open in browser");
+        assert_eq!(rows[0][0]["url"], page);
+        assert_eq!(rows[1][0]["text"], "Open in MetaMask");
+        assert_eq!(
+            rows[1][0]["url"],
+            format!(
+                "https://link.metamask.io/dapp/{}",
+                page.trim_start_matches("https://")
+            )
+        );
+        let code: serde_json::Value = serde_json::from_slice(&requests[1].body).unwrap();
+        assert!(code.get("reply_markup").is_none());
     }
 
     /// Regression: a chunk that fails after earlier chunks in the same call

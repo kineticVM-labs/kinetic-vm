@@ -194,6 +194,74 @@ fn open_keyboard(page: &str) -> serde_json::Value {
     })
 }
 
+const WALLET_HOSTS: &[&str] = &["claim.kineticvm.xyz", "vault-deposit.kineticvm.xyz"];
+const TELEGRAM_URL_BUTTON_MAX: usize = 2048;
+
+/// Buttons for the first claim or vault page in `text`.
+///
+/// A chat reply cannot build a Telegram keyboard. The sender attaches this
+/// when the message contains a page the owner or a customer opens in a wallet.
+pub fn wallet_keyboard_for_message(text: &str) -> Option<serde_json::Value> {
+    let page = first_wallet_page(text)?;
+    let metamask = metamask_dapp_url(&page);
+    if page.len() > TELEGRAM_URL_BUTTON_MAX || metamask.len() > TELEGRAM_URL_BUTTON_MAX {
+        return None;
+    }
+    Some(open_keyboard(&page))
+}
+
+fn first_wallet_page(text: &str) -> Option<String> {
+    let mut rest = text;
+    while let Some(start) = rest.find("https://") {
+        let tail = &rest[start..];
+        let end = tail
+            .char_indices()
+            .find(|(_, ch)| url_stop(*ch))
+            .map(|(index, _)| index)
+            .unwrap_or(tail.len());
+        if let Some(page) = wallet_page(tail[..end].trim_end_matches(url_tail)) {
+            return Some(page);
+        }
+        let next = start + end.max("https://".len());
+        if next >= rest.len() {
+            break;
+        }
+        rest = &rest[next..];
+    }
+    None
+}
+
+fn url_stop(ch: char) -> bool {
+    ch.is_whitespace() || matches!(ch, '<' | '>' | '"' | '\'' | ')' | ']' | '`')
+}
+
+fn url_tail(ch: char) -> bool {
+    matches!(ch, '.' | ',' | ';' | '!' | '?' | ':')
+}
+
+fn wallet_page(raw: &str) -> Option<String> {
+    let page = raw
+        .strip_prefix("https://link.metamask.io/dapp/")
+        .map(|inner| format!("https://{inner}"))
+        .unwrap_or_else(|| raw.to_string());
+    let host = page_host(&page)?;
+    WALLET_HOSTS.contains(&host).then_some(page)
+}
+
+fn page_host(url: &str) -> Option<&str> {
+    let rest = url.strip_prefix("https://")?;
+    let authority = rest.split(['/', '?', '#']).next()?;
+    let hostport = authority.split('@').next_back()?;
+    Some(match hostport.rsplit_once(':') {
+        Some((host, port))
+            if !port.is_empty() && port.bytes().all(|byte| byte.is_ascii_digit()) =>
+        {
+            host
+        }
+        _ => hostport,
+    })
+}
+
 /// MetaMask opens this page in its in-app browser. The host and query stay intact.
 fn metamask_dapp_url(page: &str) -> String {
     let rest = page.trim().trim_start_matches("https://");
@@ -270,7 +338,7 @@ mod tests {
 
     use super::{
         Advance, ClaimFacts, advance, bound_chat, claimed_html, funding_markup, offer_delivery,
-        offer_message,
+        offer_message, wallet_keyboard_for_message,
     };
 
     fn config() -> (tempfile::TempDir, Config) {
@@ -415,5 +483,48 @@ mod tests {
             rows[1][0]["url"],
             "https://link.metamask.io/dapp/vault-deposit.kineticvm.xyz?address=0x3333333333333333333333333333333333333333&agent=7"
         );
+    }
+
+    #[test]
+    fn a_payment_sentence_gets_browser_and_metamask_buttons() {
+        let page = "https://vault-deposit.kineticvm.xyz?address=0x77102fCAC7927bB64507DF82bf1ae659465B4EE5&agent=12";
+        let text = format!("Cola is 1.5 MON. Pay here: {page} Reply when the transfer is done.");
+        let markup = wallet_keyboard_for_message(&text).expect("buttons");
+        let rows = markup["inline_keyboard"].as_array().expect("rows");
+        assert_eq!(rows[0][0]["text"], "Open in browser");
+        assert_eq!(rows[0][0]["url"], page);
+        assert_eq!(rows[1][0]["text"], "Open in MetaMask");
+        assert_eq!(
+            rows[1][0]["url"],
+            format!(
+                "https://link.metamask.io/dapp/{}",
+                page.trim_start_matches("https://")
+            )
+        );
+    }
+
+    #[test]
+    fn claim_and_withdraw_pages_get_buttons_and_other_links_do_not() {
+        let withdraw = "https://vault-deposit.kineticvm.xyz/withdraw?address=0x77102fCAC7927bB64507DF82bf1ae659465B4EE5&agent=9";
+        let markup =
+            wallet_keyboard_for_message(&format!("Withdraw here: {withdraw}.")).expect("withdraw");
+        assert_eq!(markup["inline_keyboard"][0][0]["url"], withdraw);
+
+        let claim = "https://claim.kineticvm.xyz?t=abc";
+        let wrapped = format!(
+            "https://link.metamask.io/dapp/{}",
+            claim.trim_start_matches("https://")
+        );
+        let from_metamask = wallet_keyboard_for_message(&wrapped).expect("claim");
+        assert_eq!(from_metamask["inline_keyboard"][0][0]["url"], claim);
+        assert_eq!(from_metamask["inline_keyboard"][1][0]["url"], wrapped);
+
+        assert!(
+            wallet_keyboard_for_message(
+                "Read https://docs.kineticvm.xyz and https://marketplace.kineticvm.xyz"
+            )
+            .is_none()
+        );
+        assert!(wallet_keyboard_for_message("Your code is 5435.").is_none());
     }
 }

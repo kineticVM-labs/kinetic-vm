@@ -280,16 +280,14 @@ impl OwnerPing {
         else {
             return;
         };
-        if client
-            .post(endpoint)
-            .json(&serde_json::json!({
-                "chat_id": self.chat_id,
-                "text": text,
-            }))
-            .send()
-            .await
-            .is_err()
-        {
+        let mut body = serde_json::json!({
+            "chat_id": self.chat_id,
+            "text": text,
+        });
+        if let Some(markup) = crate::claim_watch::wallet_keyboard_for_message(&text) {
+            body["reply_markup"] = markup;
+        }
+        if client.post(endpoint).json(&body).send().await.is_err() {
             ::kinetic_log::record!(
                 WARN,
                 ::kinetic_log::Event::new(module_path!(), ::kinetic_log::Action::Note),

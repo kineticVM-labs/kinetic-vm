@@ -5,6 +5,7 @@
 pub mod catalog;
 pub mod device;
 pub mod gpio;
+pub mod host_message;
 pub mod peripherals;
 pub mod protocol;
 pub mod registry;

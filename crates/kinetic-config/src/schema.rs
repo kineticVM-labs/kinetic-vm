@@ -523,6 +523,16 @@ pub struct Config {
     #[group = "Foundation"]
     pub records: RecordsConfig,
 
+    /// Marketplace listing (`[marketplace]`).
+    ///
+    /// `url` defaults to `https://marketplace.kineticvm.xyz`. The owner sets
+    /// `marketplace.key` after the marketplace issues it. An unset key means
+    /// listing is unavailable. The device still runs. This is not a Pinata key.
+    #[serde(default, skip_serializing_if = "MarketplaceConfig::is_default")]
+    #[nested]
+    #[group = "Foundation"]
+    pub marketplace: MarketplaceConfig,
+
     /// Voice transcription configuration (Whisper API via Groq).
     #[serde(default)]
     #[nested]
@@ -3272,6 +3282,51 @@ impl Config {
     }
 }
 
+fn default_marketplace_url() -> String {
+    "https://marketplace.kineticvm.xyz".into()
+}
+
+fn marketplace_url_is_default(url: &String) -> bool {
+    url == &default_marketplace_url()
+}
+
+/// Marketplace listing (`[marketplace]`).
+///
+/// `url` is where a listing is sent. `key` is the API key the marketplace
+/// gives the device owner. Set the key with `kinetic config set marketplace.key`.
+/// The prompt masks the value.
+#[derive(Debug, Clone, Serialize, Deserialize, Configurable)]
+#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
+#[prefix = "marketplace"]
+pub struct MarketplaceConfig {
+    /// Marketplace API address. Shown by `kinetic config get marketplace.url`.
+    #[serde(default = "default_marketplace_url")]
+    pub url: String,
+    /// API key from the marketplace. Stored encrypted. Unset leaves listing off.
+    #[secret]
+    #[credential_class = "encrypted_secret"]
+    #[cfg_attr(feature = "schema-export", schemars(extend("x-secret" = true)))]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key: Option<String>,
+}
+
+impl Default for MarketplaceConfig {
+    fn default() -> Self {
+        Self {
+            url: default_marketplace_url(),
+            key: None,
+        }
+    }
+}
+
+impl MarketplaceConfig {
+    /// True when the address is the published one and no key is stored.
+    #[must_use]
+    pub fn is_default(&self) -> bool {
+        self.key.is_none() && marketplace_url_is_default(&self.url)
+    }
+}
+
 fn operation_field_name_ok(name: &str) -> bool {
     let mut chars = name.chars();
     match chars.next() {
@@ -5177,15 +5232,18 @@ impl Default for CostConfig {
 /// Peripheral board integration configuration (`[peripherals]` section).
 ///
 /// Boards become agent tools when enabled.
-#[derive(Debug, Clone, Serialize, Deserialize, Default, Configurable)]
+#[derive(Debug, Clone, Serialize, Deserialize, Configurable)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
 #[prefix = "peripherals"]
 pub struct PeripheralsConfig {
-    /// Enable peripheral support (boards become agent tools)
-    #[serde(default)]
+    /// Enable peripheral support (boards become agent tools). On unless the
+    /// operator sets this to false.
+    #[serde(default = "default_peripherals_enabled")]
     pub enabled: bool,
-    /// Board configurations (nucleo-f401re, rpi-gpio, etc.)
-    #[serde(default)]
+    /// Board configurations. When this key is absent, the daemon listens for
+    /// an ESP32 on `/dev/ttyUSB0` and for a Pico, Nucleo, or Arduino on
+    /// `/dev/ttyACM0`. An explicit list, including `boards = []`, replaces that.
+    #[serde(default = "default_peripheral_boards")]
     pub boards: Vec<PeripheralBoardConfig>,
     /// Path to datasheet docs (relative to workspace) for RAG retrieval.
     /// Place .md/.txt files named by board (e.g. nucleo-f401re.md, rpi-gpio.md).
@@ -5210,12 +5268,49 @@ pub struct PeripheralBoardConfig {
     pub baud: u32,
 }
 
+fn default_peripherals_enabled() -> bool {
+    true
+}
+
 fn default_peripheral_transport() -> String {
     "serial".into()
 }
 
 fn default_peripheral_baud() -> u32 {
     115_200
+}
+
+fn serial_board(board: &str, path: &str) -> PeripheralBoardConfig {
+    PeripheralBoardConfig {
+        board: board.to_string(),
+        transport: default_peripheral_transport(),
+        path: Some(path.to_string()),
+        baud: default_peripheral_baud(),
+    }
+}
+
+/// Ports the daemon opens when `config.toml` does not list boards.
+///
+/// A USB-UART ESP32 enumerates as `ttyUSB0`. A Pico, a Nucleo, and an Arduino
+/// enumerate as `ttyACM0`, so those three names share that port. A procedure
+/// trigger picks the name; it does not set the path.
+fn default_peripheral_boards() -> Vec<PeripheralBoardConfig> {
+    vec![
+        serial_board("esp32", "/dev/ttyUSB0"),
+        serial_board("pico", "/dev/ttyACM0"),
+        serial_board("nucleo", "/dev/ttyACM0"),
+        serial_board("arduino", "/dev/ttyACM0"),
+    ]
+}
+
+impl Default for PeripheralsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_peripherals_enabled(),
+            boards: default_peripheral_boards(),
+            datasheet_dir: None,
+        }
+    }
 }
 
 impl Default for PeripheralBoardConfig {
@@ -16707,6 +16802,7 @@ impl Default for Config {
             hardware: HardwareConfig::default(),
             chain: ChainConfig::default(),
             records: RecordsConfig::default(),
+            marketplace: MarketplaceConfig::default(),
             query_classification: QueryClassificationConfig::default(),
             transcription: TranscriptionConfig::default(),
             tts: TtsConfig::default(),
@@ -27777,6 +27873,7 @@ auto_save = true
             hardware: HardwareConfig::default(),
             chain: ChainConfig::default(),
             records: RecordsConfig::default(),
+            marketplace: MarketplaceConfig::default(),
             transcription: TranscriptionConfig::default(),
             tts: TtsConfig::default(),
             nodes: NodesConfig::default(),
@@ -28909,6 +29006,7 @@ default_temperature = 0.7
             hardware: HardwareConfig::default(),
             chain: ChainConfig::default(),
             records: RecordsConfig::default(),
+            marketplace: MarketplaceConfig::default(),
             transcription: TranscriptionConfig::default(),
             tts: TtsConfig::default(),
             nodes: NodesConfig::default(),
@@ -32770,10 +32868,30 @@ runtime_profile = "default"
     // ── Peripherals config ───────────────────────────────────────
 
     #[test]
-    async fn peripherals_config_default_disabled() {
+    async fn peripherals_config_defaults_to_enabled() {
         let p = PeripheralsConfig::default();
-        assert!(!p.enabled);
-        assert!(p.boards.is_empty());
+        assert!(p.enabled);
+        assert_eq!(
+            p.boards
+                .iter()
+                .map(|board| (board.board.as_str(), board.path.as_deref()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("esp32", Some("/dev/ttyUSB0")),
+                ("pico", Some("/dev/ttyACM0")),
+                ("nucleo", Some("/dev/ttyACM0")),
+                ("arduino", Some("/dev/ttyACM0")),
+            ]
+        );
+        let parsed: PeripheralsConfig = toml::from_str("").expect("empty peripherals");
+        assert!(parsed.enabled);
+        assert_eq!(parsed.boards.len(), 4);
+        let off: PeripheralsConfig = toml::from_str("enabled = false").expect("explicit off");
+        assert!(!off.enabled);
+        assert_eq!(off.boards.len(), 4);
+        let cleared: PeripheralsConfig = toml::from_str("boards = []").expect("explicit boards");
+        assert!(cleared.enabled);
+        assert!(cleared.boards.is_empty());
     }
 
     #[test]
@@ -35221,6 +35339,77 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
         assert!(crate::secrets::SecretStore::is_encrypted(encrypted));
         let store = crate::secrets::SecretStore::new(dir.path(), true);
         assert_eq!(store.decrypt(encrypted).unwrap(), "Bearer from-config-set");
+    }
+
+    #[test]
+    async fn marketplace_key_is_an_optional_encrypted_secret() {
+        assert!(Config::prop_is_secret("marketplace.key"));
+        assert!(!Config::prop_is_secret("marketplace.url"));
+        let fresh = Config::default();
+        assert!(fresh.marketplace.key.is_none());
+        assert_eq!(
+            fresh.get_prop("marketplace.url").unwrap(),
+            "https://marketplace.kineticvm.xyz"
+        );
+        let parsed: MarketplaceConfig = toml::from_str("").expect("empty marketplace");
+        assert!(parsed.key.is_none());
+        assert_eq!(parsed.url, "https://marketplace.kineticvm.xyz");
+        assert!(parsed.is_default());
+
+        let dir = TempDir::new().unwrap();
+        let config_path = dir.path().join("config.toml");
+        tokio::fs::write(&config_path, "schema_version = 1\n")
+            .await
+            .unwrap();
+        let mut config = Config {
+            config_path: config_path.clone(),
+            data_dir: dir.path().join("workspace"),
+            secrets: SecretsConfig { encrypt: true },
+            ..Config::default()
+        };
+        assert_eq!(
+            config.get_prop("marketplace.url").unwrap(),
+            "https://marketplace.kineticvm.xyz"
+        );
+        config
+            .set_prop_persistent("marketplace.url", "https://example.test")
+            .unwrap();
+        assert_eq!(
+            config.get_prop("marketplace.url").unwrap(),
+            "https://example.test"
+        );
+        config
+            .set_prop_persistent("marketplace.key", "mk_test_key")
+            .unwrap();
+        assert_eq!(config.marketplace.key.as_deref(), Some("mk_test_key"));
+        let shown = config.get_prop("marketplace.key").unwrap();
+        assert!(
+            shown.contains("****") && !shown.contains("mk_test_key"),
+            "marketplace key must stay masked, got {shown}"
+        );
+
+        let field = config
+            .prop_fields()
+            .into_iter()
+            .find(|field| field.name == "marketplace.key")
+            .expect("marketplace key field");
+        assert!(field.is_secret);
+        assert_eq!(
+            field.credential_class,
+            Some(crate::config::CredentialSurfaceClass::EncryptedSecret)
+        );
+
+        config.save_dirty().await.unwrap();
+        let contents = tokio::fs::read_to_string(&config_path).await.unwrap();
+        assert!(
+            !contents.contains("mk_test_key"),
+            "marketplace key must not be written in plaintext: {contents}"
+        );
+        let stored = crate::migration::migrate_to_current(&contents).unwrap();
+        let encrypted = stored.marketplace.key.as_deref().unwrap();
+        assert!(crate::secrets::SecretStore::is_encrypted(encrypted));
+        let store = crate::secrets::SecretStore::new(dir.path(), true);
+        assert_eq!(store.decrypt(encrypted).unwrap(), "mk_test_key");
     }
 
     #[test]

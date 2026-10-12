@@ -21,9 +21,9 @@ pub fn format_mon(amount: U256) -> String {
 }
 pub use client::{
     ActionAttestation, Binding, BootReport, ChainClient, ClaimPageQuery, ClaimTicket,
-    VaultGasShort, VaultStatus, action_request_hash, binding_from_device, claim_page_url,
-    ensure_public_claim_url, ensure_supported_network, gas_top_up_amount, is_vault_gas_short,
-    owner_link_message, recover_personal_signer, unclaimed_claim_text,
+    VaultGasShort, VaultStatus, action_request_hash, attested_params_hash, binding_from_device,
+    claim_page_url, ensure_public_claim_url, ensure_supported_network, gas_top_up_amount,
+    is_vault_gas_short, owner_link_message, recover_personal_signer, unclaimed_claim_text,
 };
 pub use key::{DeviceSigner, SoftwareKey};
 

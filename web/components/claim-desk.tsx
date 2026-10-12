@@ -1,12 +1,11 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
-import Link from "next/link";
 import { useState } from "react";
 import { createPublicClient, decodeEventLog, http, parseEther, type Hash, type Log } from "viem";
 import { useChainId, useConnect, useConnection, useConnectors, useDisconnect, useSendTransaction, useSwitchChain, useWriteContract, type Connector } from "wagmi";
 
-import { Atmosphere } from "@/components/storm";
+import { DeskEyebrow, DeskShell } from "@/components/desk-shell";
+import { CheckIcon } from "@/components/icons";
 import { WalletPill } from "@/components/wallet-pill";
 import { agentUri, parseClaim } from "@/lib/claim";
 import { homeHref, links } from "@/lib/links";
@@ -57,8 +56,6 @@ const erc721Abi = [
   },
 ] as const;
 
-const RISE = { type: "spring" as const, stiffness: 320, damping: 30 };
-
 type Step = "ready" | "claiming" | "approving" | "funding" | "done";
 
 export function ClaimDesk({
@@ -69,7 +66,6 @@ export function ClaimDesk({
   host: string;
 }) {
   const parsed = parseClaim(query);
-  const reduce = useReducedMotion();
   const connection = useConnection();
   const chainId = useChainId();
   const connectors = useConnectors();
@@ -220,18 +216,10 @@ export function ClaimDesk({
   const expired = !parsed.ok && parsed.problems.length === 1 && parsed.problems[0].includes("expired");
 
   return (
-    <div className="relative min-h-dvh">
-      <Atmosphere />
-      <header className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-5 py-4 sm:px-10">
-        {home.startsWith("/") ? (
-          <Link href={home} className="brand">
-            KINETIC
-          </Link>
-        ) : (
-          <a href={home} className="brand">
-            KINETIC
-          </a>
-        )}
+    <DeskShell
+      home={home}
+      tone={done ? "done" : error ? "failed" : "idle"}
+      wallet={
         <WalletPill
           address={connected}
           connectors={connectors}
@@ -241,88 +229,79 @@ export function ClaimDesk({
           onConnect={connectWallet}
           onDisconnect={disconnectWallet}
         />
-      </header>
-
-      <main className="flex min-h-dvh items-center justify-center px-6 pb-16 pt-24">
-        <motion.section
-          className={`w-full max-w-lg border bg-raise px-6 py-8 backdrop-blur-md sm:px-8 ${
-            done ? "claim-done" : error ? "claim-failed" : "border-line"
-          }`}
-          initial={reduce ? false : { opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={RISE}
-        >
-          {claim ? (
-            <ClaimBody
-              name={claim.name}
-              owner={short(claim.owner)}
-              device={short(claim.device)}
-              perTx={`${claim.perTx} MON`}
-              daily={`${claim.daily} MON`}
-              chain={`${chainName(claim.chainId)} · ${claim.chainId}`}
-              deadline={formatDeadline(claim.deadline)}
-              connected={Boolean(connected)}
-              claimed={claimed || done}
-              approved={step === "funding" || done}
-              funded={done}
-              busy={busy || switching || step === "claiming"}
-              done={done}
-              canClaim={ownerMatches && Boolean(identity)}
-              label={
-                step === "claiming"
-                  ? "Confirm the claim"
-                  : step === "approving"
-                    ? "Approve the attestor"
-                    : step === "funding"
-                      ? "Confirm the gas"
-                      : done
-                        ? "Claimed"
-                        : "Claim this device"
-              }
-              onClaim={() => void run()}
-              note={
-                done
-                  ? null
-                  : connected && !ownerMatches
-                    ? `This link belongs to ${short(claim.owner)}. The connected wallet is ${short(connected)}.`
-                    : connected && ownerMatches && !onChain
-                      ? `This wallet is on chain ${chainId}. Claiming switches it to ${chainName(claim.chainId)}.`
-                      : !connected
-                        ? "Connect the owner wallet in the corner, then confirm."
-                        : null
-              }
-              error={error}
-              agentId={agentId}
-              claimHash={claimHash}
-              approvalHash={approvalHash}
-              chainId={claim.chainId}
-            />
-          ) : (
-            <Empty expired={expired} error={error} />
-          )}
-        </motion.section>
-      </main>
-    </div>
+      }
+    >
+      {claim ? (
+        <ClaimBody
+          name={claim.name}
+          owner={short(claim.owner)}
+          device={short(claim.device)}
+          perTx={`${claim.perTx} MON`}
+          daily={`${claim.daily} MON`}
+          chain={`${chainName(claim.chainId)} · ${claim.chainId}`}
+          deadline={formatDeadline(claim.deadline)}
+          connected={Boolean(connected)}
+          claimed={claimed || done}
+          approved={step === "funding" || done}
+          funded={done}
+          busy={busy || switching || step === "claiming"}
+          done={done}
+          canClaim={ownerMatches && Boolean(identity)}
+          label={
+            step === "claiming"
+              ? "Confirm the claim"
+              : step === "approving"
+                ? "Approve the attestor"
+                : step === "funding"
+                  ? "Confirm the gas"
+                  : done
+                    ? "Claimed"
+                    : "Claim this device"
+          }
+          onClaim={() => void run()}
+          note={
+            done
+              ? null
+              : connected && !ownerMatches
+                ? `This link belongs to ${short(claim.owner)}. The connected wallet is ${short(connected)}.`
+                : connected && ownerMatches && !onChain
+                  ? `This wallet is on chain ${chainId}. Claiming switches it to ${chainName(claim.chainId)}.`
+                  : !connected
+                    ? "Connect the owner wallet in the corner, then confirm."
+                    : null
+          }
+          error={error}
+          agentId={agentId}
+          claimHash={claimHash}
+          approvalHash={approvalHash}
+          chainId={claim.chainId}
+        />
+      ) : (
+        <Empty expired={expired} error={error} />
+      )}
+    </DeskShell>
   );
 }
 
 function Empty({ expired, error }: { expired: boolean; error: string | null }) {
   return (
     <div className="text-center">
-      <p className="font-mono text-xs tracking-[0.28em] text-violet">CLAIM</p>
-      <h1 className="mt-4 text-3xl">{expired ? "This link has expired" : "Waiting on the device"}</h1>
-      <p className="mx-auto mt-4 max-w-sm text-sm leading-7 text-dim">
+      <DeskEyebrow>Claim</DeskEyebrow>
+      <h1 className="mt-4 text-3xl font-semibold tracking-[-0.03em] text-ink">
+        {expired ? "This link has expired" : "Waiting on the device"}
+      </h1>
+      <p className="mx-auto mt-4 max-w-sm text-[15px] leading-7 text-fg">
         {expired
           ? "Start the device again. A fresh claim link will arrive on Telegram."
           : "Open the claim link the device sent on Telegram. The signature and the caps travel with that link."}
       </p>
       {error ? (
-        <p className="mt-6 text-sm text-violet-hot" role="alert">
+        <p className="claim-alert mt-6 text-sm" role="alert">
           {error}
         </p>
       ) : null}
-      <a href={links.docs} className="nav-link mt-6">
-        Docs
+      <a href={links.docs} className="btn btn-secondary mt-8">
+        Read docs
       </a>
     </div>
   );
@@ -377,12 +356,12 @@ function ClaimBody({
 }) {
   return (
     <>
-      <p className="font-mono text-xs tracking-[0.28em] text-violet">CLAIM</p>
-      <h1 className="mt-3 text-3xl">{name}</h1>
-      <p className="mt-3 text-sm leading-7 text-dim">
+      <DeskEyebrow>Claim</DeskEyebrow>
+      <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-ink">{name}</h1>
+      <p className="mt-3 text-[15px] leading-7 text-fg">
         Three wallet requests. The last one sends 1 MON to the device for gas. The device key never leaves the machine.
       </p>
-      <dl className="mt-8 divide-y divide-line border-y border-line">
+      <dl className="mt-8 divide-y divide-line rounded-2xl border border-line bg-paper px-4">
         <Fact label="Owner" value={owner} />
         <Fact label="Device" value={device} />
         <Fact label="Per transaction" value={perTx} />
@@ -390,18 +369,18 @@ function ClaimBody({
         <Fact label="Chain" value={chain} />
         <Fact label="Expires" value={deadline} />
       </dl>
-      <ol className="mt-6 flex items-center gap-3 text-xs tracking-wide">
+      <ol className="mt-6 flex items-center gap-2 text-xs">
         <Mark on={connected} label="Wallet" />
-        <span className="h-px flex-1 bg-line" />
+        <span className="h-px flex-1 bg-line" aria-hidden="true" />
         <Mark on={claimed} label="Claim" />
-        <span className="h-px flex-1 bg-line" />
+        <span className="h-px flex-1 bg-line" aria-hidden="true" />
         <Mark on={approved} label="Attestor" />
-        <span className="h-px flex-1 bg-line" />
+        <span className="h-px flex-1 bg-line" aria-hidden="true" />
         <Mark on={funded} label="Gas" />
       </ol>
       <button
         type="button"
-        className={`${done ? "btn-success" : "btn-white"} mt-8 w-full`}
+        className={`btn btn-lg ${done ? "btn-success" : "btn-primary"} mt-8 w-full`}
         onClick={onClaim}
         disabled={!canClaim || busy || done}
       >
@@ -412,13 +391,13 @@ function ClaimBody({
           Claimed. The identity is in the owner wallet, the attestor can record what this device does, and the device holds 1 MON for gas.
         </p>
       ) : null}
-      {note ? <p className="mt-4 text-sm leading-6 text-dim">{note}</p> : null}
+      {note ? <p className="mt-4 text-sm leading-6 text-muted">{note}</p> : null}
       {error ? (
         <p className="claim-alert mt-4 text-sm leading-6" role="alert">
           {error}
         </p>
       ) : null}
-      {agentId ? <p className="mt-4 text-sm">Agent {agentId}</p> : null}
+      {agentId ? <p className="mt-4 font-mono text-sm text-ink">Agent #{agentId}</p> : null}
       <HashLink chainId={chainId} hash={claimHash} label="View claim on the explorer" prominent={done} />
       <HashLink chainId={chainId} hash={approvalHash} label="View approval on the explorer" prominent={done} />
     </>
@@ -450,13 +429,13 @@ function HashLink({
 }) {
   if (!hash) return null;
   const href = explorerTx(chainId, hash);
-  if (!href) return <p className="mt-3 text-sm text-dim">{label} {short(hash)}</p>;
+  if (!href) return <p className="mt-3 text-sm text-muted">{label} {short(hash)}</p>;
   return (
     <p className="mt-3 text-sm">
       <a
         href={href}
-        className={`focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-violet ${
-          prominent ? "font-medium text-success" : "text-violet-hot"
+        className={`underline decoration-current/30 underline-offset-4 hover:decoration-current ${
+          prominent ? "font-medium text-success" : "text-purple-deep"
         }`}
       >
         {label}
@@ -468,14 +447,24 @@ function HashLink({
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-6 py-3">
-      <dt className="text-sm text-dim">{label}</dt>
-      <dd className="font-mono text-sm text-foreground">{value}</dd>
+      <dt className="text-sm text-muted">{label}</dt>
+      <dd className="font-mono text-sm text-ink">{value}</dd>
     </div>
   );
 }
 
 function Mark({ on, label }: { on: boolean; label: string }) {
-  return <li className={on ? "text-foreground" : "text-dim"}>{label}</li>;
+  return (
+    <li className={`inline-flex items-center gap-1.5 ${on ? "font-medium text-ink" : "text-muted"}`}>
+      <span
+        className={`grid size-4 place-items-center rounded-full ${on ? "bg-purple text-white" : "border border-line bg-surface"}`}
+        aria-hidden="true"
+      >
+        {on ? <CheckIcon width={10} height={10} strokeWidth={3} /> : null}
+      </span>
+      {label}
+    </li>
+  );
 }
 
 function formatDeadline(seconds: bigint) {

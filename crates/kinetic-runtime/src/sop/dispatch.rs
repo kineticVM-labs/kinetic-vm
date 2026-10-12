@@ -278,9 +278,10 @@ pub fn ingress_kind(source: SopTriggerSource) -> SopIngressKind {
         // `check_sop_cron_triggers` calls `dispatch_sop_event` directly with the
         // daemon's owned, non-optional engine/audit handles; never through `SopIngress`.
         SopTriggerSource::Cron => SopIngressKind::DedicatedInternalDispatch,
-        // `SopTrigger::Peripheral` doc: "no peripheral listener feeds it"; the
-        // `dispatch_peripheral_signal` helper exists but has no live caller.
-        SopTriggerSource::Peripheral => SopIngressKind::NotYetLive,
+        // The daemon serial listener calls `dispatch_untrusted_fan_in_driven`
+        // when a board sends an event line. `dispatch_peripheral_signal` remains
+        // a direct helper for tests.
+        SopTriggerSource::Peripheral => SopIngressKind::SharedIngress,
         // Routed through `dispatch_untrusted_fan_in` (-> `SopIngress`) by the
         // filesystem watcher (channels/src/filesystem.rs).
         SopTriggerSource::Filesystem => SopIngressKind::SharedIngress,
@@ -3655,7 +3656,7 @@ mod tests {
                 // Live via the gateway HTTP fan-in routes.
                 SopTriggerSource::Webhook => SopIngressKind::SharedIngress,
                 SopTriggerSource::Cron => SopIngressKind::DedicatedInternalDispatch,
-                SopTriggerSource::Peripheral => SopIngressKind::NotYetLive,
+                SopTriggerSource::Peripheral => SopIngressKind::SharedIngress,
                 SopTriggerSource::Filesystem => SopIngressKind::SharedIngress,
                 SopTriggerSource::Calendar => SopIngressKind::NotYetLive,
                 SopTriggerSource::Channel => SopIngressKind::SharedIngress,

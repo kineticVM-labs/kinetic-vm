@@ -509,7 +509,7 @@ impl ChainClient {
         let timestamp = U256::from(self.latest_timestamp().await?);
         let nonce = self.fresh_nonce(agent_id, timestamp).await?;
         let action_hash = keccak256(action.as_bytes());
-        let params_hash = keccak256(params.as_bytes());
+        let params_hash = attested_params_hash(params);
         let proof = IKineticAttestor::ActionProof {
             agentId: agent_id,
             action: action_hash,
@@ -644,6 +644,12 @@ async fn transaction_hash(
         anyhow::bail!("the chain transaction reverted");
     }
     Ok(receipt.transaction_hash)
+}
+
+/// `keccak256` of the exact parameter bytes an attestation signs.
+#[must_use]
+pub fn attested_params_hash(params: &str) -> B256 {
+    keccak256(params.as_bytes())
 }
 
 /// `keccak256(abi.encode(agentId, action, paramsHash, keccak256(uri), timestamp, nonce))`.

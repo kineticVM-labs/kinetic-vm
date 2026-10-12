@@ -1026,6 +1026,8 @@ Examples:
   kinetic config get channels.matrix.mention-only      # get a value
   kinetic config set channels.matrix.mention-only true # set a value
   kinetic config set channels.matrix.access-token      # secret: masked input
+  kinetic config get marketplace.url                   # marketplace address
+  kinetic config set marketplace.key                   # marketplace key: masked input
   kinetic config set channels.matrix.stream-mode       # enum: interactive select
   kinetic config init channels.matrix                  # init section with defaults
   kinetic config init risk_profiles.strict             # create a new dynamic-map alias
@@ -6059,6 +6061,26 @@ async fn async_main_inner(command: clap::Command) -> Result<()> {
                     }
                     _ => None,
                 };
+                #[cfg(feature = "hardware")]
+                let peripheral_listener = spawn_peripheral_listener(
+                    sop_engine.as_ref(),
+                    sop_audit.as_ref(),
+                    sop_driver_sink.clone(),
+                );
+                #[cfg(feature = "hardware")]
+                if let Err(error) = kinetic_hardware::peripherals::create_peripheral_tools(
+                    &current_config.peripherals,
+                )
+                .await
+                {
+                    ::kinetic_log::record!(
+                        WARN,
+                        ::kinetic_log::Event::new(module_path!(), ::kinetic_log::Action::Fail)
+                            .with_outcome(::kinetic_log::EventOutcome::Failure)
+                            .with_attrs(::serde_json::json!({"error": error.to_string()})),
+                        "peripheral listener did not open the configured boards"
+                    );
+                }
 
                 #[cfg(feature = "gateway")]
                 registry.register_gateway(Box::new({
@@ -6668,6 +6690,10 @@ async fn async_main_inner(command: clap::Command) -> Result<()> {
                     startup_feedback_enabled,
                 ))
                 .await;
+                #[cfg(feature = "hardware")]
+                if let Some(listener) = peripheral_listener {
+                    listener.stop();
+                }
                 // Before the loop re-reads config and builds a fresh SOP
                 // engine: in-flight cron drivers hold this generation's config
                 // and engine, so they must not straddle the rebuild.
@@ -7523,6 +7549,25 @@ Add pricing to the active provider profile or supply a catalog entry."
                     }
                     _ => None,
                 };
+                #[cfg(feature = "hardware")]
+                let peripheral_listener = spawn_peripheral_listener(
+                    sop_engine.as_ref(),
+                    sop_audit.as_ref(),
+                    sop_driver_sink.clone(),
+                );
+                #[cfg(feature = "hardware")]
+                if let Err(error) =
+                    kinetic_hardware::peripherals::create_peripheral_tools(&config.peripherals)
+                        .await
+                {
+                    ::kinetic_log::record!(
+                        WARN,
+                        ::kinetic_log::Event::new(module_path!(), ::kinetic_log::Action::Fail)
+                            .with_outcome(::kinetic_log::EventOutcome::Failure)
+                            .with_attrs(::serde_json::json!({"error": error.to_string()})),
+                        "peripheral listener did not open the configured boards"
+                    );
+                }
                 // Standalone channel mode owns the live-pricing refresher.
                 kinetic_runtime::daemon::spawn_pricing_refresher(&config);
 
@@ -7534,6 +7579,10 @@ Add pricing to the active provider profile or supply a catalog entry."
                     sop_driver_sink,
                 ))
                 .await;
+                #[cfg(feature = "hardware")]
+                if let Some(listener) = peripheral_listener {
+                    listener.stop();
+                }
 
                 // `channel start` runs one configuration generation and exits,
                 // but drivers still hold the engine; drain them before the
@@ -10865,6 +10914,49 @@ fn reap_orphaned_sop_drivers(
 /// exits. The tick itself self-approves nothing - timeout handling follows
 /// `approval_timeout_action` (default `escalate`, fail-closed).
 #[cfg(feature = "agent-runtime")]
+#[cfg(feature = "hardware")]
+struct PeripheralListener {
+    task: tokio::task::JoinHandle<()>,
+}
+
+#[cfg(feature = "hardware")]
+impl PeripheralListener {
+    fn stop(self) {
+        self.task.abort();
+        kinetic_hardware::host_message::clear_host_event_sink();
+    }
+}
+
+/// Listen for lines a board sends on its own and start a matching procedure.
+/// The text becomes the procedure payload. The topic is `board/signal`.
+#[cfg(feature = "hardware")]
+fn spawn_peripheral_listener(
+    engine: Option<&std::sync::Arc<std::sync::Mutex<kinetic_runtime::sop::SopEngine>>>,
+    audit: Option<&std::sync::Arc<kinetic_runtime::sop::SopAuditLogger>>,
+    driver_sink: Option<kinetic_runtime::sop::SopDriverSink>,
+) -> Option<PeripheralListener> {
+    let engine = engine.cloned()?;
+    let audit = audit.cloned()?;
+    let (tx, mut rx) = tokio::sync::mpsc::channel(32);
+    kinetic_hardware::host_message::set_host_event_sink(tx);
+    let task = ::kinetic_spawn::spawn!(async move {
+        while let Some(event) = rx.recv().await {
+            let topic = format!("{}/{}", event.board, event.signal);
+            let _ = kinetic_runtime::sop::dispatch::dispatch_untrusted_fan_in_driven(
+                &engine,
+                &audit,
+                driver_sink.as_ref(),
+                kinetic_runtime::sop::SopTriggerSource::Peripheral,
+                Some(&topic),
+                Some(event.text.as_str()),
+                None,
+            )
+            .await;
+        }
+    });
+    Some(PeripheralListener { task })
+}
+
 fn spawn_sop_maintenance(
     config: &Config,
     sop_engine: Option<&std::sync::Arc<std::sync::Mutex<kinetic_runtime::sop::SopEngine>>>,

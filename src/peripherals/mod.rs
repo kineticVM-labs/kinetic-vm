@@ -25,9 +25,9 @@ pub async fn handle_command(cmd: crate::PeripheralCommands, config: &Config) -> 
                 println!("  enabled = true"); // i18n-exempt: literal config.toml snippet
                 println!();
                 println!("  [[peripherals.boards]]"); // i18n-exempt: literal config.toml snippet
-                println!("  board = \"nucleo-f401re\""); // i18n-exempt: literal config.toml snippet
+                println!("  board = \"esp32\""); // i18n-exempt: literal config.toml snippet
                 println!("  transport = \"serial\""); // i18n-exempt: literal config.toml snippet
-                println!("  path = \"/dev/ttyACM0\""); // i18n-exempt: literal config.toml snippet
+                println!("  path = \"/dev/ttyUSB0\""); // i18n-exempt: literal config.toml snippet
             } else {
                 println!("{}", get_required_cli_string("cli-peripherals-configured"));
                 for b in boards {

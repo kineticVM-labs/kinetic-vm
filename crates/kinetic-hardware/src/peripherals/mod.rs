@@ -52,6 +52,7 @@ pub async fn create_peripheral_tools(config: &PeripheralsConfig) -> Result<Vec<B
 
     let mut tools: Vec<Box<dyn Tool>> = Vec::new();
     let mut serial_transports: Vec<(String, std::sync::Arc<serial::SerialTransport>)> = Vec::new();
+    let mut failed_paths = std::collections::HashSet::new();
 
     for board in &config.boards {
         // Arduino Uno Q: Bridge transport (socket to local Bridge app)
@@ -99,13 +100,16 @@ pub async fn create_peripheral_tools(config: &PeripheralsConfig) -> Result<Vec<B
         if board.transport != "serial" {
             continue;
         }
-        if board.path.is_none() {
+        let Some(path) = board.path.clone() else {
             ::kinetic_log::record!(
                 WARN,
                 ::kinetic_log::Event::new(module_path!(), ::kinetic_log::Action::Note)
                     .with_outcome(::kinetic_log::EventOutcome::Unknown),
                 &format!("Skipping serial board {}: no path", board.board)
             );
+            continue;
+        };
+        if failed_paths.contains(&path) {
             continue;
         }
 
@@ -120,8 +124,14 @@ pub async fn create_peripheral_tools(config: &PeripheralsConfig) -> Result<Vec<B
                         &format!("Peripheral {} connect warning (continuing)", p.name())
                     );
                 }
-                serial_transports.push((board.board.clone(), p.transport()));
-                tools.extend(p.tools());
+                let transport = p.transport();
+                let first_for_path = !serial_transports
+                    .iter()
+                    .any(|(_, existing)| std::sync::Arc::ptr_eq(existing, &transport));
+                serial_transports.push((board.board.clone(), std::sync::Arc::clone(&transport)));
+                if first_for_path {
+                    tools.extend(p.tools());
+                }
                 if board.board == "arduino-uno"
                     && let Some(ref path) = board.path
                 {
@@ -159,6 +169,7 @@ pub async fn create_peripheral_tools(config: &PeripheralsConfig) -> Result<Vec<B
                 );
             }
             Err(e) => {
+                failed_paths.insert(path);
                 ::kinetic_log::record!(
                     WARN,
                     ::kinetic_log::Event::new(module_path!(), ::kinetic_log::Action::Note)

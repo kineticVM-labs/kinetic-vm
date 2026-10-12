@@ -138,10 +138,10 @@ export function WalletPill({
           className="wallet-menu"
           onKeyDown={onMenuKeyDown}
         >
-          <p className="px-3 pb-1 pt-2 font-mono text-xs tracking-[0.22em] text-violet">
+          <p className="px-3 pb-1 pt-2 font-mono text-[11px] uppercase tracking-[0.16em] text-purple-deep">
             {address ? "Change wallet" : "Choose a wallet"}
           </p>
-          {wallets.length === 0 ? <p className="px-3 py-3 text-sm leading-6 text-dim">{EMPTY}</p> : null}
+          {wallets.length === 0 ? <p className="px-3 py-3 text-sm leading-6 text-muted">{EMPTY}</p> : null}
           {wallets.map((wallet) => {
             const current = wallet.id === currentId;
             const name = wallet.id === "injected" ? "Browser wallet" : wallet.name;
@@ -166,7 +166,7 @@ export function WalletPill({
                   )}
                   <span className="min-w-0 truncate">{name}</span>
                 </span>
-                {current ? <span className="text-xs text-dim">Current</span> : null}
+                {current ? <span className="text-xs text-muted">Current</span> : null}
               </button>
             );
           })}
@@ -176,7 +176,7 @@ export function WalletPill({
               <button
                 type="button"
                 role="menuitem"
-                className="wallet-item text-violet-hot"
+                className="wallet-item text-danger"
                 disabled={connecting}
                 onClick={() => void disconnect()}
               >
@@ -185,7 +185,7 @@ export function WalletPill({
             </>
           ) : null}
           {error ? (
-            <p className="px-3 py-2 text-sm leading-6 text-violet-hot" role="alert">
+            <p className="px-3 py-2 text-sm leading-6 text-danger" role="alert">
               {error}
             </p>
           ) : null}

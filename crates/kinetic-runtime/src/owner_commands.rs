@@ -43,8 +43,52 @@ pub async fn handle(config: &Config, telegram_id: &str, line: &str) -> String {
             }
             owned_command(config, dir, &name, &args).await
         }
+        "sell_data" => {
+            if !bound_owner_chat(config, telegram_id) {
+                return text("cli-owner-not-bound");
+            }
+            if !marketplace_key_ready(config) {
+                return text("cli-owner-sell-data-needs-key");
+            }
+            // The channel layer does not call this once the key is set. The
+            // message reaches the model, which asks for any listing detail it
+            // is not sure about and then calls the sell_data tool.
+            text("cli-owner-sell-data-ask")
+        }
         _ => text("cli-owner-usage-link"),
     }
+}
+
+/// `/sell_data` reaches the model when the owner chat has a marketplace key.
+///
+/// The model asks for any listing detail it is not sure about, then calls
+/// the `sell_data` tool. A missing key stays on this command and tells the
+/// owner where to get one.
+#[must_use]
+pub fn sell_data_reaches_the_model(config: &Config, telegram_id: &str, line: &str) -> bool {
+    let Some((name, _)) = split_line(line) else {
+        return false;
+    };
+    name == "sell_data"
+        && config.chain.enabled
+        && valid_telegram_id(telegram_id)
+        && bound_owner_chat(config, telegram_id)
+        && marketplace_key_ready(config)
+}
+
+/// Model-facing note appended when `/sell_data` is handed to the assistant.
+#[must_use]
+pub fn sell_data_model_note(line: &str) -> String {
+    format!(
+        "{line}\n\nThe owner wants to list this device's operation records. Use ask_user for any of the title, summary, description, machine type, license, or price you are not sure about. Then call sell_data. Do not guess the price."
+    )
+}
+
+fn marketplace_key_ready(config: &Config) -> bool {
+    config.marketplace.key.as_deref().is_some_and(|key| {
+        let key = key.trim();
+        !key.is_empty() && !kinetic_config::secrets::SecretStore::is_encrypted(key)
+    })
 }
 
 fn bound_owner_chat(config: &Config, telegram_id: &str) -> bool {
@@ -723,6 +767,51 @@ mod tests {
                 ..PeerGroupConfig::default()
             },
         );
+    }
+
+    #[tokio::test]
+    async fn sell_data_without_a_key_tells_the_owner_where_to_get_one() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let mut config = test_config(dir.path(), true);
+        bind_chat(&mut config, "42");
+        let reply = handle(&config, "42", "/sell_data").await;
+        assert_eq!(reply, text("cli-owner-sell-data-needs-key"));
+        assert!(reply.contains("https://marketplace.kineticvm.xyz"));
+        assert!(reply.contains("kinetic config set marketplace.key"));
+        assert!(!sell_data_reaches_the_model(&config, "42", "/sell_data"));
+        assert!(!dir.path().join("device.key").exists());
+    }
+
+    #[tokio::test]
+    async fn sell_data_from_another_chat_does_not_mention_the_marketplace() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let mut config = test_config(dir.path(), true);
+        bind_chat(&mut config, "42");
+        let reply = handle(&config, "99", "/sell_data@kinetic_bot").await;
+        assert_eq!(reply, text("cli-owner-not-bound"));
+        assert!(!reply.contains("marketplace.kineticvm.xyz"));
+        assert!(!dir.path().join("device.key").exists());
+    }
+
+    #[tokio::test]
+    async fn sell_data_with_a_key_reaches_the_model() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let mut config = test_config(dir.path(), true);
+        bind_chat(&mut config, "42");
+        config.marketplace.key = Some("kvm_test_listing_key".to_string());
+        assert!(sell_data_reaches_the_model(
+            &config,
+            "42",
+            "/sell_data@kinetic_bot"
+        ));
+        let note = sell_data_model_note("/sell_data");
+        assert!(note.starts_with("/sell_data\n"));
+        assert!(note.contains("ask_user"));
+        assert!(note.contains("Do not guess the price."));
+        assert!(!sell_data_reaches_the_model(&config, "99", "/sell_data"));
+        let reply = handle(&config, "42", "/sell_data").await;
+        assert_eq!(reply, text("cli-owner-sell-data-ask"));
+        assert!(!dir.path().join("device.key").exists());
     }
 
     #[test]

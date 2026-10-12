@@ -530,7 +530,6 @@ output_price_per_million = 15.0
 
 [peripherals]
 enabled = true
-boards = []
 
 [agents]
 

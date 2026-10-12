@@ -6,11 +6,24 @@ use esp_idf_svc::hal::uart::{UartConfig, UartDriver};
 use esp_idf_svc::hal::units::Hertz;
 use heapless::{String, Vec};
 use log::info;
-use kinetic_fw_protocol::{Command, copy_id, write_err, write_ok};
+use kinetic_fw_protocol::{Command, copy_id, write_err, write_host_message, write_ok};
 
 // Pre-escaped because `write_ok` embeds this value as a JSON string without escaping.
 const CAPABILITIES_RESULT: &str =
     r#"{\"gpio\":[0,1,2,3,4,5,12,13,14,15,16,17,18,19],\"led_pin\":2}"#;
+
+macro_rules! send_idle_message {
+    ($uart:expr, $outbound:expr) => {{
+        if let Some(message) = take_host_message() {
+            if write_host_message(&mut $outbound, &message.signal, &message.text) {
+                let _ = $uart.write($outbound.as_bytes());
+                let _ = $uart.write(b"\n");
+            } else {
+                log::warn!("host message was not sent");
+            }
+        }
+    }};
+}
 
 fn main() -> anyhow::Result<()> {
     esp_idf_svc::sys::link_patches();
@@ -40,9 +53,10 @@ fn main() -> anyhow::Result<()> {
     let mut line: Vec<u8, 400> = Vec::new();
     let mut resp_buf: String<256> = String::new();
 
+    let mut outbound: String<384> = String::new();
     loop {
         match uart.read(&mut buf, 100) {
-            Ok(0) => continue,
+            Ok(0) => send_idle_message!(uart, outbound),
             Ok(n) => {
                 for &b in &buf[..n] {
                     if b == b'\n' {
@@ -56,10 +70,33 @@ fn main() -> anyhow::Result<()> {
                         line.clear();
                     }
                 }
+                if line.is_empty() {
+                    send_idle_message!(uart, outbound);
+                }
             }
-            Err(_) => {}
+            Err(_) => send_idle_message!(uart, outbound),
         }
     }
+}
+
+/// One message this board sends to the Pi without being asked.
+struct HostMessage {
+    signal: String<32>,
+    text: String<200>,
+}
+
+/// Return the next message for the Pi, or `None` when nothing new happened.
+///
+/// The main loop calls this whenever the serial line is idle. Replace the
+/// body to scan a keypad, a button, a sensor, or any other local input.
+/// Return `Some` once for each new message, then `None` until the next one.
+/// Returning `Some` on every call sends that message again on every idle poll.
+///
+/// `signal` is the name a procedure matches (`keypad`, `button`, `scale`).
+/// `text` is the message, such as the digits typed before enter. A signal is
+/// a letter or `_`, then letters, digits, `_`, or `-`, at most 32 characters.
+fn take_host_message() -> Option<HostMessage> {
+    None
 }
 
 fn handle_request<G2, G13>(

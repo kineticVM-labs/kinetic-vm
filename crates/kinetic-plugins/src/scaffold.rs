@@ -244,6 +244,18 @@ version = "0.1.0"
 
 [[triggers]]
 type = "manual"
+
+# Uncomment this to start the procedure when a board sends a message.
+# The daemon already listens for these boards. Change board to the one you flash.
+# signal is the name take_host_message returns, such as keypad, button, or scale.
+#   esp32    /dev/ttyUSB0
+#   pico     /dev/ttyACM0
+#   nucleo   /dev/ttyACM0
+#   arduino  /dev/ttyACM0
+# [[triggers]]
+# type = "peripheral"
+# board = "esp32"
+# signal = "keypad"
 "#;
 
 const SOP_MD: &str = r#"<!-- Replace this procedure. Delete the starter step and write your own. -->
@@ -301,6 +313,10 @@ mod tests {
 
         let sop = fs::read_to_string(path.join("sop/SOP.toml")).expect("sop");
         assert!(sop.contains("name = \"sample_pkg\""));
+        assert!(sop.contains("type = \"manual\""));
+        assert!(sop.contains("# type = \"peripheral\""));
+        assert!(sop.contains("# board = \"esp32\""));
+        assert!(sop.contains("# signal = \"keypad\""));
         let steps = fs::read_to_string(path.join("sop/SOP.md")).expect("steps");
         assert!(steps.contains("\"tool\":\"ping\""));
 

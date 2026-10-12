@@ -33,7 +33,8 @@ pub fn chain_tools(config: &Config, key_dir: PathBuf) -> Vec<Arc<dyn Tool>> {
             config.operation_records_path(),
         )),
         Arc::new(VaultStatusTool::new(chain.clone(), key_dir.clone())),
-        Arc::new(VaultPayTool::new(chain, key_dir, ping)),
+        Arc::new(VaultPayTool::new(chain, key_dir.clone(), ping)),
+        Arc::new(super::sell_data::SellDataTool::new(config, key_dir)),
     ]
 }
 
@@ -447,9 +448,11 @@ impl Tool for MonadAttestTool {
                 let tx = attestation.transaction_hash.to_string();
                 let request = attestation.request_hash.to_string();
                 if let crate::records::PreparedOperation::Line(line) = &prepared {
-                    if let Err(error) =
-                        crate::records::append_operation_line(&self.records_path, line)
-                    {
+                    if let Err(error) = crate::records::append_attested_operation(
+                        &self.records_path,
+                        line,
+                        &request,
+                    ) {
                         ::kinetic_log::record!(
                             WARN,
                             ::kinetic_log::Event::new(module_path!(), ::kinetic_log::Action::Write)

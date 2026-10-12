@@ -339,6 +339,8 @@ cli-config-long-about =
       kinetic config get channels.matrix.mention-only      # get a value
       kinetic config set channels.matrix.mention-only true # set a value
       kinetic config set channels.matrix.access-token      # secret: masked input
+      kinetic config get marketplace.url                   # marketplace address
+      kinetic config set marketplace.key                   # marketplace key: masked input
       kinetic config set channels.matrix.stream-mode       # enum: interactive select
       kinetic config init channels.matrix                  # init section with defaults
       kinetic config schema                                # print JSON Schema to stdout
@@ -1505,10 +1507,8 @@ cli-claim-link-about = Print the public page where the owner wallet claims this 
 cli-claim-link-ready = Open this page in the owner wallet to claim the device: {$url}
 cli-claim-watch-offer-title = Claim {$name}
 cli-claim-watch-offer-body = Tap the button to claim this device with the owner wallet. Confirm the claim, approve the attestor, and send 1 MON of gas to the device. The device key stays on the machine.
-cli-claim-watch-button = Claim on Monad
-cli-claim-watch-copy-link = [ Click to copy link ]
-cli-claim-watch-copy-hint = Tap the link to copy it, then paste it in a browser.
-cli-claim-watch-deposit-button = Deposit
+cli-claim-watch-button = Open in browser
+cli-claim-watch-metamask-button = Open in MetaMask
 cli-claim-watch-deposit = Click the link below to send MON to the device vault so it can spend:
 cli-claim-watch-device-vault = Device Vault
 cli-claim-watch-claimed-title = {$name} is claimed
@@ -1584,7 +1584,21 @@ cli-owner-limits = Per-transaction cap {$per_tx} MON. Daily cap {$daily} MON. Pa
 cli-owner-usage-resume = Send /resume to get a digest. Then send /resume, the deadline, and the signature.
 cli-owner-usage-limits = Send /limits to see caps. Send /limits, a per-transaction amount, and a daily amount to change them.
 cli-owner-usage-approve = Send /approve and an address to allow a recipient. Then send /approve, the address, the deadline, and the signature.
-cli-owner-usage-link = Send /status, /pause, /resume, /limits, /approve, /deposit, or /withdraw.
+cli-owner-usage-link = Send /status, /pause, /resume, /limits, /approve, /deposit, /withdraw, or /sell_data.
+cli-owner-sell-data-needs-key = Get an API key from https://marketplace.kineticvm.xyz and set it with kinetic config set marketplace.key.
+cli-owner-sell-data-ask = Tell me the title, summary, description, machine type, license, and the price in MON.
+cli-sell-data-listed = Listed {$count} records. {$url}
+cli-sell-data-empty = There are no operation records to list yet.
+cli-sell-data-missing-requests = These operation records have no request hashes, so they cannot be listed.
+cli-sell-data-mismatch = The operation records and their request hashes do not line up, so they cannot be listed.
+cli-sell-data-blank-line = The operation records contain a blank line, so they cannot be listed.
+cli-sell-data-bad-request = A saved request hash is not valid, so these records cannot be listed.
+cli-sell-data-duplicate-request = A request hash is repeated, so these records cannot be listed.
+cli-sell-data-too-many = A listing can hold 5000 records in this version.
+cli-sell-data-too-large = The operation records are larger than 20MB.
+cli-sell-data-unreadable = The operation records could not be read.
+cli-sell-data-unreachable = The marketplace could not be reached.
+cli-sell-data-refused = The listing was refused. {$reason}
 cli-owner-deposit = Fund this device vault: {$url}
 cli-owner-withdraw = Withdraw from this device vault: {$url}
 cli-owner-gas-short = The vault does not have enough MON for device gas. Fund it: {$url}

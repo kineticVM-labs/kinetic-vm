@@ -165,7 +165,9 @@ pub enum SopTrigger {
         /// Cron expression evaluated over the run window.
         expression: String,
     },
-    /// Hardware signal. Defined and matched, but no peripheral listener feeds it.
+    /// Hardware signal. Live: the daemon's serial listener feeds it when a board
+    /// sends `{"event":"message","signal":"...","text":"..."}`. The topic is
+    /// `board/signal` and the text is the payload.
     #[trigger(display = "board/signal")]
     Peripheral {
         /// Board identifier the signal originates from.

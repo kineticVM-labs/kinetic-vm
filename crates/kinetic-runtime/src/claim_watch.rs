@@ -152,9 +152,6 @@ pub fn device_label(config: &Config) -> String {
     }
 }
 
-/// Telegram copies at most this many characters from a button.
-const COPY_TEXT_LIMIT: usize = 256;
-
 /// The claim note and the buttons under it.
 pub struct ClaimNote {
     pub text: String,
@@ -172,36 +169,35 @@ fn offer_message(name: &str) -> String {
 }
 
 pub fn offer_delivery(name: &str, page: &str) -> ClaimNote {
-    let open = get_required_cli_string("cli-claim-watch-button");
-    let mut rows = vec![vec![serde_json::json!({ "text": open, "url": page })]];
-    let mut text = offer_message(name);
-    if page.chars().count() <= COPY_TEXT_LIMIT {
-        let copy = get_required_cli_string("cli-claim-watch-copy-link");
-        rows.push(vec![
-            serde_json::json!({ "text": copy, "copy_text": { "text": page } }),
-        ]);
-    } else {
-        let hint = get_required_cli_string("cli-claim-watch-copy-hint");
-        let page = escape_html(page);
-        text = format!("{text}\n\n{hint}\n<code>{page}</code>");
-    }
     ClaimNote {
-        text,
-        markup: serde_json::json!({ "inline_keyboard": rows }),
+        text: offer_message(name),
+        markup: open_keyboard(page),
     }
 }
 
 pub fn funding_markup(facts: &ClaimFacts) -> serde_json::Value {
-    let deposit = get_required_cli_string("cli-claim-watch-deposit-button");
     let page = format!(
         "https://vault-deposit.kineticvm.xyz?address={}&agent={}",
         facts.vault, facts.agent_id
     );
+    open_keyboard(&page)
+}
+
+fn open_keyboard(page: &str) -> serde_json::Value {
+    let browser = get_required_cli_string("cli-claim-watch-button");
+    let metamask = get_required_cli_string("cli-claim-watch-metamask-button");
     serde_json::json!({
         "inline_keyboard": [
-            [{ "text": deposit, "url": page }]
+            [{ "text": browser, "url": page }],
+            [{ "text": metamask, "url": metamask_dapp_url(page) }]
         ]
     })
+}
+
+/// MetaMask opens this page in its in-app browser. The host and query stay intact.
+fn metamask_dapp_url(page: &str) -> String {
+    let rest = page.trim().trim_start_matches("https://");
+    format!("https://link.metamask.io/dapp/{rest}")
 }
 
 /// Print the claimed device, then the line that means it is waiting for work.
@@ -366,29 +362,41 @@ mod tests {
     }
 
     #[test]
-    fn the_claim_note_has_a_button_that_copies_the_link() {
+    fn the_claim_note_opens_in_the_browser_or_in_metamask() {
         let page = "https://claim.kineticvm.xyz?t=abc";
         let note = offer_delivery("Vending <lab>", page);
         let rows = note.markup["inline_keyboard"].as_array().expect("rows");
         assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0][0]["text"], "Open in browser");
         assert_eq!(rows[0][0]["url"], page);
-        assert_eq!(rows[1][0]["text"], "[ Click to copy link ]");
-        assert_eq!(rows[1][0]["copy_text"]["text"], page);
+        assert_eq!(rows[1][0]["text"], "Open in MetaMask");
+        assert_eq!(
+            rows[1][0]["url"],
+            "https://link.metamask.io/dapp/claim.kineticvm.xyz?t=abc"
+        );
+        assert!(rows[1][0].get("copy_text").is_none());
         assert!(!note.text.contains("http"));
     }
 
     #[test]
-    fn a_long_claim_link_is_copied_from_the_message() {
+    fn a_long_claim_link_stays_on_the_buttons() {
         let page = format!("https://claim.kineticvm.xyz?x={}", "a".repeat(300));
         let note = offer_delivery("Vending", &page);
-        assert!(note.text.contains("Tap the link to copy it"));
-        assert!(note.text.contains("<code>https://claim.kineticvm.xyz?x="));
+        assert!(!note.text.contains("https://"));
         let rows = note.markup["inline_keyboard"].as_array().expect("rows");
-        assert_eq!(rows.len(), 1);
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0][0]["url"], page);
+        assert_eq!(
+            rows[1][0]["url"],
+            format!(
+                "https://link.metamask.io/dapp/claim.kineticvm.xyz?x={}",
+                "a".repeat(300)
+            )
+        );
     }
 
     #[test]
-    fn the_funding_buttons_copy_the_vault_and_the_agent_key() {
+    fn the_funding_buttons_open_the_deposit_page_in_the_browser_or_in_metamask() {
         let markup = funding_markup(&ClaimFacts {
             chat_id: "42".to_string(),
             name: "Newton".to_string(),
@@ -398,11 +406,14 @@ mod tests {
             vault: "0x3333333333333333333333333333333333333333".to_string(),
         });
         let rows = markup["inline_keyboard"].as_array().expect("rows");
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0][0]["text"], "Deposit");
+        let page = "https://vault-deposit.kineticvm.xyz?address=0x3333333333333333333333333333333333333333&agent=7";
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0][0]["text"], "Open in browser");
+        assert_eq!(rows[0][0]["url"], page);
+        assert_eq!(rows[1][0]["text"], "Open in MetaMask");
         assert_eq!(
-            rows[0][0]["url"],
-            "https://vault-deposit.kineticvm.xyz?address=0x3333333333333333333333333333333333333333&agent=7"
+            rows[1][0]["url"],
+            "https://link.metamask.io/dapp/vault-deposit.kineticvm.xyz?address=0x3333333333333333333333333333333333333333&agent=7"
         );
     }
 }

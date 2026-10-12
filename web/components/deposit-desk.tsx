@@ -1,12 +1,10 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
-import Link from "next/link";
 import { useState } from "react";
 import { createPublicClient, http, isAddress, parseEther, type Address, type Hash } from "viem";
 import { useChainId, useConnect, useConnection, useConnectors, useDisconnect, useSwitchChain, useWriteContract, type Connector } from "wagmi";
 
-import { Atmosphere } from "@/components/storm";
+import { DeskEyebrow, DeskShell } from "@/components/desk-shell";
 import { WalletPill } from "@/components/wallet-pill";
 import { homeHref } from "@/lib/links";
 import { explorerTx, KINETIC, monadTestnet } from "@/lib/monad";
@@ -45,8 +43,6 @@ const vaultAbi = [
   },
 ] as const;
 
-const RISE = { type: "spring" as const, stiffness: 320, damping: 30 };
-
 export function DepositDesk({
   host,
   address,
@@ -56,7 +52,6 @@ export function DepositDesk({
   address: string;
   agentId: string;
 }) {
-  const reduce = useReducedMotion();
   const connection = useConnection();
   const chainId = useChainId();
   const connectors = useConnectors();
@@ -141,18 +136,10 @@ export function DepositDesk({
   const explorer = hash ? explorerTx(CHAIN_ID, hash) : null;
 
   return (
-    <div className="relative min-h-dvh">
-      <Atmosphere />
-      <header className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-5 py-4 sm:px-10">
-        {home.startsWith("/") ? (
-          <Link href={home} className="brand">
-            KINETIC
-          </Link>
-        ) : (
-          <a href={home} className="brand">
-            KINETIC
-          </a>
-        )}
+    <DeskShell
+      home={home}
+      tone={hash ? "done" : error ? "failed" : "idle"}
+      wallet={
         <WalletPill
           address={connected}
           connectors={connectors}
@@ -162,83 +149,73 @@ export function DepositDesk({
           onConnect={connectWallet}
           onDisconnect={disconnectAsync}
         />
-      </header>
-      <main className="flex min-h-dvh items-center justify-center px-6 pb-16 pt-24">
-        <motion.section
-          className={`w-full max-w-lg border bg-raise px-6 py-8 backdrop-blur-md sm:px-8 ${
-            hash ? "claim-done" : error ? "claim-failed" : "border-line"
-          }`}
-          initial={reduce ? false : { opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={RISE}
-        >
-          <p className="font-mono text-xs tracking-[0.28em] text-violet">DEPOSIT</p>
-          <h1 className="mt-3 text-3xl">{"Fund this Agent's Vault"}</h1>
-          <p className="mt-3 text-sm leading-7 text-dim">
-            Enter the agent vault address and an amount. The page deposits that amount into the vault.
-          </p>
-          <form
-            className="mt-8 flex flex-col gap-5"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void deposit();
-            }}
-          >
-            <label className="flex flex-col gap-2 text-sm text-dim">
-              Agent Vault Address
-              <input
-                className="field"
-                name="address"
-                autoComplete="off"
-                spellCheck={false}
-                value={vaultAddress}
-                onChange={(event) => setVaultAddress(event.target.value)}
-                placeholder="0x"
-              />
-            </label>
-            <label className="flex flex-col gap-2 text-sm text-dim">
-              Amount
-              <input
-                className="field"
-                name="amount"
-                inputMode="decimal"
-                autoComplete="off"
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-                placeholder="1"
-              />
-            </label>
-            <button type="submit" className="btn-white w-full" disabled={!canDeposit}>
-              {busy || switching ? "Confirm in the wallet" : "Deposit"}
-            </button>
-          </form>
-          {!connected ? (
-            <p className="mt-4 text-sm leading-6 text-dim">Connect a wallet in the corner. It needs MON on Monad testnet.</p>
+      }
+    >
+      <DeskEyebrow>Deposit</DeskEyebrow>
+      <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-ink">{"Fund this Agent's Vault"}</h1>
+      <p className="mt-3 text-[15px] leading-7 text-fg">
+        Enter the agent vault address and an amount. The page deposits that amount into the vault.
+      </p>
+      <form
+        className="mt-8 flex flex-col gap-5"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void deposit();
+        }}
+      >
+        <label className="flex flex-col gap-2 text-sm font-medium text-ink">
+          Agent Vault Address
+          <input
+            className="field"
+            name="address"
+            autoComplete="off"
+            spellCheck={false}
+            value={vaultAddress}
+            onChange={(event) => setVaultAddress(event.target.value)}
+            placeholder="0x"
+          />
+        </label>
+        <label className="flex flex-col gap-2 text-sm font-medium text-ink">
+          Amount
+          <input
+            className="field"
+            name="amount"
+            inputMode="decimal"
+            autoComplete="off"
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+            placeholder="1"
+          />
+        </label>
+        <button type="submit" className="btn btn-primary btn-lg mt-2 w-full" disabled={!canDeposit}>
+          {busy || switching ? "Confirm in the wallet" : "Deposit"}
+        </button>
+      </form>
+      {!connected ? (
+        <p className="mt-4 text-sm leading-6 text-muted">Connect a wallet in the corner. It needs MON on Monad testnet.</p>
+      ) : null}
+      {error ? (
+        <p className="claim-alert mt-4 text-sm leading-6" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {hash ? (
+        <p className="mt-4 text-sm leading-6 text-success">
+          Deposited.
+          {explorer ? (
+            <>
+              {" "}
+              <a
+                href={explorer}
+                className="font-medium text-success underline decoration-current/30 underline-offset-4 hover:decoration-current"
+              >
+                View the deposit on the explorer
+              </a>
+            </>
           ) : null}
-          {error ? (
-            <p className="claim-alert mt-4 text-sm leading-6" role="alert">
-              {error}
-            </p>
-          ) : null}
-          {hash ? (
-            <p className="mt-4 text-sm leading-6 text-success">
-              Deposited.
-              {explorer ? (
-                <>
-                  {" "}
-                  <a
-                    href={explorer}
-                    className="font-medium text-success focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-violet"
-                  >
-                    View the deposit on the explorer
-                  </a>
-                </>
-              ) : null}
-            </p>
-          ) : null}
-        </motion.section>
-      </main>
-    </div>
+        </p>
+      ) : null}
+    </DeskShell>
   );
 }
 

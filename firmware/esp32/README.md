@@ -9,8 +9,11 @@ Peripheral firmware for ESP32 — speaks the same JSON-over-serial protocol as t
 
 - **Request** (host → ESP32): `{"id":"1","cmd":"gpio_write","args":{"pin":13,"value":1}}\n`
 - **Response** (ESP32 → host): `{"id":"1","ok":true,"result":"done"}\n`
+- **Event** (ESP32 → host, unsolicited): `{"event":"message","signal":"keypad","text":"1234"}\n`
 
-Commands: `gpio_read`, `gpio_write`.
+Commands the host sends: `gpio_read`, `gpio_write`, `ping`, `capabilities`.
+
+To push a keypad code, a button, or any other local reading, edit `take_host_message` in `src/main.rs`. Return `Some` once when a new message is ready. The Pi matches a procedure trigger `board/signal` and passes `text` to that procedure. Returning `Some` on every call repeats the message.
 
 ## Prerequisites
 
@@ -58,18 +61,18 @@ espflash flash target/riscv32imc-esp-espidf/release/esp32 --monitor
 
 ## Host Config
 
-Add to `config.toml`:
+The daemon already listens for an ESP32 on `/dev/ttyUSB0`, and for a Pico, Nucleo, or Arduino on `/dev/ttyACM0`. `enabled = false` or `boards = []` under `[peripherals]` turns that off.
+
+A procedure starts from a pushed message when its `SOP.toml` trigger is:
 
 ```toml
-[peripherals]
-enabled = true
-
-[[peripherals.boards]]
+[[triggers]]
+type = "peripheral"
 board = "esp32"
-transport = "serial"
-path = "/dev/ttyUSB0"   # or /dev/ttyACM0, COM3, etc.
-baud = 115200
+signal = "keypad"
 ```
+
+`kinetic plugin create` writes that trigger commented out in `sop/SOP.toml`. Uncomment it and set `board` to `esp32`, `pico`, `nucleo`, or `arduino`.
 
 ## Pin Mapping
 

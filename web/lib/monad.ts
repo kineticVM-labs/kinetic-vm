@@ -26,6 +26,19 @@ export const IDENTITY: Record<number, `0x${string}`> = {
   143: "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
 };
 
+/** ERC-8004 validation registry. Attestations are read back from here. */
+export const VALIDATION: Record<number, `0x${string}`> = {
+  10143: "0x8004Cb1BF31DAf7788923b405b754f57acEB4272",
+  143: "0x8004Cc8439f36fd5F9F049D9fF86523Df6dAAB58",
+};
+
+/** Kinetic attestor on chains where it is deployed. It is the only accepted validator. */
+export const ATTESTOR: Record<number, `0x${string}`> = {
+  10143: "0x6e46d149b7d3396b42e874765cf5a1bb26bd5ba5",
+};
+
+export const MARKET_CHAIN_ID = 10143;
+
 /** Published KineticVM contracts. A plain transfer to the vault is rejected. */
 export const KINETIC: Record<number, { registry: `0x${string}`; vault: `0x${string}` }> = {
   10143: {
@@ -34,10 +47,25 @@ export const KINETIC: Record<number, { registry: `0x${string}`; vault: `0x${stri
   },
 };
 
+function explorerBase(chainId: number): string | null {
+  if (chainId === 10143) return monadTestnet.blockExplorers.default.url;
+  if (chainId === 143) return monadMainnet.blockExplorers.default.url;
+  return null;
+}
+
 export function explorerTx(chainId: number, hash: string): string | null {
-  const chain = chainId === 10143 ? monadTestnet : chainId === 143 ? monadMainnet : null;
-  if (!chain) return null;
-  return `${chain.blockExplorers.default.url}/tx/${hash}`;
+  const base = explorerBase(chainId);
+  return base ? `${base}/tx/${hash}` : null;
+}
+
+export function explorerAddress(chainId: number, address: string): string | null {
+  const base = explorerBase(chainId);
+  return base ? `${base}/address/${address}` : null;
+}
+
+export function explorerNft(chainId: number, contract: string, tokenId: string): string | null {
+  const base = explorerBase(chainId);
+  return base ? `${base}/token/${contract}/instance/${tokenId}` : null;
 }
 
 export function chainName(chainId: number): string {

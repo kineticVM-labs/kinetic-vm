@@ -2624,7 +2624,7 @@ fn parse_runtime_command(channel_name: &str, content: &str) -> Option<ChannelRun
             Some(ChannelRuntimeCommand::ShowConfig)
         }
         "/link" | "/status" | "/pause" | "/resume" | "/limits" | "/approve" | "/deposit"
-        | "/withdraw"
+        | "/withdraw" | "/sell_data"
             if channel_name == "telegram" =>
         {
             Some(ChannelRuntimeCommand::Owner(trimmed.to_string()))
@@ -4823,6 +4823,16 @@ async fn handle_runtime_command_for_delivery(
     let Some(channel) = target_channel else {
         return true;
     };
+
+    if let ChannelRuntimeCommand::Owner(line) = &command
+        && kinetic_runtime::owner_commands::sell_data_reaches_the_model(
+            &ctx.live_config.read(),
+            msg.platform_sender_id.as_deref().unwrap_or(""),
+            line,
+        )
+    {
+        return false;
+    }
 
     let sender_key = runtime_conversation_history_key(ctx, msg);
     let defaults_snapshot = runtime_defaults_snapshot(ctx);
@@ -9002,6 +9012,14 @@ async fn process_channel_message_body(
             model: matched_route.model.clone(),
             api_key: matched_route.api_key.clone(),
         };
+    }
+
+    if kinetic_runtime::owner_commands::sell_data_reaches_the_model(
+        &ctx.live_config.read(),
+        msg.platform_sender_id.as_deref().unwrap_or(""),
+        &msg.content,
+    ) {
+        msg.content = kinetic_runtime::owner_commands::sell_data_model_note(&msg.content);
     }
 
     let mut context_limits = resolve_channel_context_limits(
@@ -37629,6 +37647,16 @@ BTC is currently around $65,000 based on latest tool output."#
         assert_eq!(
             parse_runtime_command("telegram", "/status"),
             Some(ChannelRuntimeCommand::Owner("/status".to_string()))
+        );
+        assert_eq!(
+            parse_runtime_command("telegram", "/sell_data"),
+            Some(ChannelRuntimeCommand::Owner("/sell_data".to_string()))
+        );
+        assert_eq!(
+            parse_runtime_command("telegram", "/sell_data@kinetic_bot"),
+            Some(ChannelRuntimeCommand::Owner(
+                "/sell_data@kinetic_bot".to_string()
+            ))
         );
         assert_eq!(
             parse_runtime_command("telegram", "/limits@kinetic_bot 0.02 1"),

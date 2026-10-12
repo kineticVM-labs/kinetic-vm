@@ -11,6 +11,7 @@ import { licenseDetail, licenseLabel, machineLabel } from "@/lib/marketplace/cat
 import { accessForListing, getPublicListing } from "@/lib/marketplace/db";
 import { formatMon, formatRows, shortAddress } from "@/lib/marketplace/format";
 import { getSample } from "@/lib/marketplace/samples";
+import { links } from "@/lib/links";
 import { explorerAddress } from "@/lib/monad";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -46,9 +47,9 @@ export default async function DatasetPage({ params }: { params: Promise<{ slug: 
         <nav aria-label="Breadcrumb" className="mt-3 text-sm text-muted">
           <ol className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <li>
-              <Link href="/marketplace" className="hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple">
+              <a href={links.marketplace} className="hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple">
                 Marketplace
-              </Link>
+              </a>
             </li>
             <li aria-hidden="true">/</li>
             <li>

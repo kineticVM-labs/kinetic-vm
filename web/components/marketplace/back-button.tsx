@@ -2,7 +2,9 @@
 
 import { useRouter } from "next/navigation";
 
-export function BackButton({ fallback = "/marketplace" }: { fallback?: string }) {
+import { links } from "@/lib/links";
+
+export function BackButton({ fallback = links.marketplace }: { fallback?: string }) {
   const router = useRouter();
 
   return (
@@ -11,7 +13,8 @@ export function BackButton({ fallback = "/marketplace" }: { fallback?: string })
       className="btn btn-secondary min-h-10 px-3.5 text-sm"
       onClick={() => {
         if (window.history.length > 1) router.back();
-        else router.push(fallback);
+        else if (fallback.startsWith("/")) router.push(fallback);
+        else window.location.assign(fallback);
       }}
     >
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

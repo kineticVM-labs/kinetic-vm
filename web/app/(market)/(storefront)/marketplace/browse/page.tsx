@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { ListingColumns, ListingRow } from "@/components/marketplace/listing-row";
+import { links } from "@/lib/links";
 import { MACHINE_TYPES } from "@/lib/marketplace/catalog";
 import { listCatalog } from "@/lib/marketplace/samples";
 
@@ -25,9 +26,9 @@ export default async function BrowsePage({
   return (
     <div className="mx-auto max-w-7xl px-6 pt-4 pb-24">
       <p className="text-sm text-muted">
-        <Link href="/marketplace" className="hover:text-ink">
+        <a href={links.marketplace} className="hover:text-ink">
           Marketplace
-        </Link>
+        </a>
       </p>
       <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-ink sm:text-4xl">All datasets</h1>
       <p className="mt-3 max-w-2xl text-[15px] leading-7 text-fg">Search the full catalog. Preview the proof, pay the owner, then download the file.</p>

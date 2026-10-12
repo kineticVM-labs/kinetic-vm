@@ -1,17 +1,16 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { links } from "@/lib/links";
+
 export function SignOutButton({ className = "" }: { className?: string }) {
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
 
   async function signOut() {
     setBusy(true);
     await fetch("/api/marketplace/session", { method: "DELETE" });
-    router.push("/marketplace");
-    router.refresh();
+    window.location.assign(links.marketplace);
   }
 
   return (

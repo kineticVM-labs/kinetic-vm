@@ -4,6 +4,7 @@ import { Reveal } from "@/components/home/reveal";
 import { SmartLink } from "@/components/smart-link";
 import { Eyebrow } from "@/components/home/section-heading";
 import { CheckIcon, DataIcon } from "@/components/icons";
+import { links } from "@/lib/links";
 import { machineSrc } from "@/lib/machines";
 
 const POINTS = [
@@ -24,7 +25,7 @@ export function MarketplaceTeaser() {
             <div className="flex flex-wrap items-center gap-3">
               <Eyebrow>Data marketplace</Eyebrow>
               <SmartLink
-                href="/marketplace"
+                href={links.marketplace}
                 className="rounded-full bg-purple px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white"
               >
                 Open

@@ -40,7 +40,7 @@ const COLUMNS = [
       { label: "Identity", href: "#product" },
       { label: "Vault", href: "#product" },
       { label: "Attestations", href: "#proof" },
-      { label: "Marketplace", href: "#marketplace" },
+      { label: "Marketplace", href: links.marketplace },
     ],
   },
   {

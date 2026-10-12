@@ -8,7 +8,7 @@ import { links } from "@/lib/links";
 const NAV = [
   { href: "#product", label: "Product" },
   { href: "#how", label: "How it works" },
-  { href: "/marketplace", label: "Marketplace" },
+  { href: links.marketplace, label: "Marketplace" },
   { href: "#builders", label: "Builders" },
 ];
 

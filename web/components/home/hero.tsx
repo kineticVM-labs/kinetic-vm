@@ -1,8 +1,6 @@
 "use client";
 
 import { motion, useReducedMotion, type Variants } from "framer-motion";
-import Link from "next/link";
-
 import { CopyCommand } from "@/components/home/copy-command";
 import { EASE_OUT } from "@/components/home/reveal";
 import { ArrowRight } from "@/components/icons";
@@ -55,10 +53,10 @@ export function HeroCopy() {
       </motion.p>
 
       <motion.div variants={item} className="mt-9 flex flex-wrap items-center gap-3">
-        <Link href="/marketplace" className="btn btn-primary btn-lg group">
+        <a href={links.marketplace} className="btn btn-primary btn-lg group">
           Explore marketplace
           <ArrowRight width={18} height={18} className="transition-transform duration-200 group-hover:translate-x-0.5" />
-        </Link>
+        </a>
         <a href={links.docs} className="btn btn-secondary btn-lg">
           Read docs
         </a>

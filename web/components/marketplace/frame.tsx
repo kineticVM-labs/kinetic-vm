@@ -18,9 +18,9 @@ export async function MarketplaceFrame({ children }: { children: React.ReactNode
     <div className="min-h-full">
       <header className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-6">
         <div className="flex min-w-0 items-center gap-4">
-          <Link href="/marketplace" aria-label="Marketplace home" className="rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple">
+          <a href={links.marketplace} aria-label="Marketplace home" className="rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple">
             <Logo />
-          </Link>
+          </a>
           <nav aria-label="Marketplace" className="hidden items-center gap-1 md:flex">
             <Link href="/" className={navClass}>
               Home

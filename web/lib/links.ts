@@ -1,5 +1,6 @@
 export const links = {
   docs: "https://docs.kineticvm.xyz",
+  marketplace: "https://marketplace.kineticvm.xyz",
   github: "https://github.com/kineticVM-labs/kinetic-vm",
   x: "https://x.com/kineticvm",
 } as const;

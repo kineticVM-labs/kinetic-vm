@@ -3,7 +3,7 @@ members = [".", "crates/kinetic-api", "crates/kinetic-buildinfo", "crates/kineti
 resolver = "2"
 
 [workspace.package]
-version = "0.8.14"
+version = "0.8.15"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/kineticVM-labs/kinetic-vm"
@@ -11,28 +11,28 @@ homepage = "https://github.com/kineticVM-labs/kinetic-vm"
 rust-version = "1.96.0"
 
 [workspace.dependencies]
-kinetic-api = { path = "crates/kinetic-api", version = "0.8.14" }
-kinetic-buildinfo = { path = "crates/kinetic-buildinfo", version = "0.8.14" }
-kinetic-chain = { path = "crates/kinetic-chain", version = "0.8.14" }
-kinetic-infra = { path = "crates/kinetic-infra", version = "0.8.14" }
-kinetic-config = { path = "crates/kinetic-config", version = "0.8.14", default-features = false }
-kinetic-log = { path = "crates/kinetic-log", version = "0.8.14" }
-kinetic-tls = { path = "crates/kinetic-tls", version = "0.8.14" }
-kinetic-relay-proto = { path = "crates/kinetic-relay-proto", version = "0.8.14" }
-kinetic-spawn = { path = "crates/kinetic-spawn", version = "0.8.14" }
-kinetic-commands = { path = "crates/kinetic-commands", version = "0.8.14" }
-kinetic-providers = { path = "crates/kinetic-providers", version = "0.8.14" }
-kinetic-memory = { path = "crates/kinetic-memory", version = "0.8.14" }
-kinetic-channels = { path = "crates/kinetic-channels", version = "0.8.14", default-features = false }
-kinetic-tools = { path = "crates/kinetic-tools", version = "0.8.14" }
-kinetic-sop-graph = { path = "crates/kinetic-sop-graph", version = "0.8.14", default-features = false }
-kinetic-runtime = { path = "crates/kinetic-runtime", version = "0.8.14", default-features = false }
-kinetic-eval = { path = "crates/kinetic-eval", version = "0.8.14" }
-kinetic-plugins = { path = "crates/kinetic-plugins", version = "0.8.14" }
-kinetic-gateway = { path = "crates/kinetic-gateway", version = "0.8.14" }
-kinetic-hardware = { path = "crates/kinetic-hardware", version = "0.8.14" }
-kinetic-tool-call-parser = { path = "crates/kinetic-tool-call-parser", version = "0.8.14" }
-kinetic-macros = { path = "crates/kinetic-macros", version = "0.8.14" }
+kinetic-api = { path = "crates/kinetic-api", version = "0.8.15" }
+kinetic-buildinfo = { path = "crates/kinetic-buildinfo", version = "0.8.15" }
+kinetic-chain = { path = "crates/kinetic-chain", version = "0.8.15" }
+kinetic-infra = { path = "crates/kinetic-infra", version = "0.8.15" }
+kinetic-config = { path = "crates/kinetic-config", version = "0.8.15", default-features = false }
+kinetic-log = { path = "crates/kinetic-log", version = "0.8.15" }
+kinetic-tls = { path = "crates/kinetic-tls", version = "0.8.15" }
+kinetic-relay-proto = { path = "crates/kinetic-relay-proto", version = "0.8.15" }
+kinetic-spawn = { path = "crates/kinetic-spawn", version = "0.8.15" }
+kinetic-commands = { path = "crates/kinetic-commands", version = "0.8.15" }
+kinetic-providers = { path = "crates/kinetic-providers", version = "0.8.15" }
+kinetic-memory = { path = "crates/kinetic-memory", version = "0.8.15" }
+kinetic-channels = { path = "crates/kinetic-channels", version = "0.8.15", default-features = false }
+kinetic-tools = { path = "crates/kinetic-tools", version = "0.8.15" }
+kinetic-sop-graph = { path = "crates/kinetic-sop-graph", version = "0.8.15", default-features = false }
+kinetic-runtime = { path = "crates/kinetic-runtime", version = "0.8.15", default-features = false }
+kinetic-eval = { path = "crates/kinetic-eval", version = "0.8.15" }
+kinetic-plugins = { path = "crates/kinetic-plugins", version = "0.8.15" }
+kinetic-gateway = { path = "crates/kinetic-gateway", version = "0.8.15" }
+kinetic-hardware = { path = "crates/kinetic-hardware", version = "0.8.15" }
+kinetic-tool-call-parser = { path = "crates/kinetic-tool-call-parser", version = "0.8.15" }
+kinetic-macros = { path = "crates/kinetic-macros", version = "0.8.15" }
 directories = "6.0"
 sys-locale = "0.3"
 hmac = "0.12"

@@ -390,6 +390,7 @@ pub(crate) async fn execute_one_tool(
                     // data-flow surfaces) that scrub at their own rendering
                     // boundary.
                     let model_visible = scrub_credentials(&full_output);
+                    crate::console::tool_failed(call_name, &model_visible);
                     observer.record_event(&ObserverEvent::ToolCall {
                         tool: call_name.to_string(),
                         tool_call_id: tool_call_id_owned.clone(),
@@ -435,6 +436,7 @@ pub(crate) async fn execute_one_tool(
                 // model-bound text; keep `error_reason` raw for trusted
                 // in-process consumers.
                 let model_visible = scrub_credentials(&reason);
+                crate::console::tool_failed(call_name, &model_visible);
                 observer.record_event(&ObserverEvent::ToolCall {
                     tool: call_name.to_string(),
                     tool_call_id: tool_call_id_owned.clone(),

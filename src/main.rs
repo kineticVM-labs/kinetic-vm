@@ -10942,6 +10942,7 @@ fn spawn_peripheral_listener(
     let task = ::kinetic_spawn::spawn!(async move {
         while let Some(event) = rx.recv().await {
             let topic = format!("{}/{}", event.board, event.signal);
+            kinetic_runtime::console::say_with("cli-console-board", &[("topic", topic.as_str())]);
             let _ = kinetic_runtime::sop::dispatch::dispatch_untrusted_fan_in_driven(
                 &engine,
                 &audit,

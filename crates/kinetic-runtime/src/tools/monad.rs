@@ -447,6 +447,7 @@ impl Tool for MonadAttestTool {
             Ok(attestation) => {
                 let tx = attestation.transaction_hash.to_string();
                 let request = attestation.request_hash.to_string();
+                crate::console::attested(action, &tx);
                 if let crate::records::PreparedOperation::Line(line) = &prepared {
                     if let Err(error) = crate::records::append_attested_operation(
                         &self.records_path,
@@ -548,8 +549,14 @@ impl Tool for AttestingTool {
         let params = args.to_string();
         let request_uri = format!("kinetic://actuator/{}", self.inner.name());
         let note = match self.record(self.inner.name(), &params, &request_uri).await {
-            Ok(tx) => text_with("cli-chain-actuator-attested", &[("tx", &tx)]),
-            Err(error) => text_with("cli-chain-actuator-attest-failed", &[("error", &error)]),
+            Ok(tx) => {
+                crate::console::attested(self.inner.name(), &tx);
+                text_with("cli-chain-actuator-attested", &[("tx", &tx)])
+            }
+            Err(error) => {
+                crate::console::tool_failed(self.inner.name(), &error);
+                text_with("cli-chain-actuator-attest-failed", &[("error", &error)])
+            }
         };
         result.output = append_note(result.output, &note);
         Ok(result)

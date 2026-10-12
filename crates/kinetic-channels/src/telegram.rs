@@ -4453,6 +4453,7 @@ impl TelegramChannel {
         if !self.message_has_processable_content(message) {
             return;
         }
+        kinetic_runtime::console::say("cli-console-telegram");
 
         // Media updates carry no top-level `text`, only an optional
         // `caption`; fall back to it so a captioned `/bind <code>` still
@@ -7174,6 +7175,7 @@ impl TelegramChannel {
         update: &serde_json::Value,
         msg: ChannelMessage,
     ) -> bool {
+        kinetic_runtime::console::say("cli-console-telegram");
         // Silent observation: a passive message must not tell the room the
         // bot saw it, so it gets neither an ack reaction nor a typing hint.
         if !msg.passive_context {
@@ -8289,6 +8291,7 @@ impl Channel for TelegramChannel {
                                 .with_attrs(::serde_json::json!({"e": e.to_string()})),
                                 "startup probe parse error: ; retrying in 5s"
                             );
+                            kinetic_runtime::console::say("cli-console-telegram-parse");
                             self.record_poll_health(false);
                             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                         }
@@ -8352,12 +8355,17 @@ impl Channel for TelegramChannel {
                                     ),
                                     "Startup probe: slot busy (409), retrying in 5s"
                                 );
+                                kinetic_runtime::console::say("cli-console-telegram-conflict");
                             } else {
                                 let desc = data
                                     .get("description")
                                     .and_then(serde_json::Value::as_str)
                                     .unwrap_or("unknown");
                                 ::kinetic_log::record!(WARN, ::kinetic_log::Event::new(module_path!(), ::kinetic_log::Action::Note).with_outcome(::kinetic_log::EventOutcome::Unknown).with_attrs(::serde_json::json!({"error_code": error_code, "desc": desc})), "Startup probe: API error : ; retrying in 5s");
+                                kinetic_runtime::console::say_with(
+                                    "cli-console-telegram-api",
+                                    &[("code", &error_code.to_string())],
+                                );
                             }
                             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                         }
@@ -8403,6 +8411,7 @@ impl Channel for TelegramChannel {
                         ),
                         "poll error"
                     );
+                    kinetic_runtime::console::say("cli-console-telegram-poll");
                     self.record_poll_health(false);
                     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                     continue;
@@ -8421,6 +8430,7 @@ impl Channel for TelegramChannel {
                         ),
                         "parse error"
                     );
+                    kinetic_runtime::console::say("cli-console-telegram-parse");
                     self.record_poll_health(false);
                     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                     continue;
@@ -8451,6 +8461,7 @@ impl Channel for TelegramChannel {
                         "Telegram polling conflict (409): . \
 Ensure only one `kinetic` process is using this bot token."
                     );
+                    kinetic_runtime::console::say("cli-console-telegram-conflict");
                     // Back off for 35 seconds — longer than Telegram's 30-second poll
                     // timeout — so any competing session (e.g. a stale connection from
                     // a previous daemon) has time to expire before we retry.
@@ -8464,6 +8475,10 @@ Ensure only one `kinetic` process is using this bot token."
                             "Telegram getUpdates API error (code={}): {description}",
                             error_code
                         )
+                    );
+                    kinetic_runtime::console::say_with(
+                        "cli-console-telegram-api",
+                        &[("code", &error_code.to_string())],
                     );
                     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                 }

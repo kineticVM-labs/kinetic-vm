@@ -22,6 +22,7 @@ pub mod browse;
 pub mod calendar;
 pub mod claim_link;
 pub mod claim_watch;
+pub mod console;
 pub mod control_plane;
 pub mod cost;
 pub mod cron;

@@ -103,8 +103,9 @@ pub struct ApprovalManager {
     audit_log: Mutex<Vec<ApprovalLogEntry>>,
 }
 
-/// Tools that still raise a card on a customer channel. A vend, a plugin,
-/// a pin write, and an attestation do not.
+/// Tools that still require a person on a customer channel and on a headless
+/// procedure. A vend, a plugin, a pin write, and an attestation do not. When
+/// a headless procedure has nobody to ask, these four are denied.
 fn channel_sale_still_asks(tool_name: &str) -> bool {
     matches!(
         tool_name,
@@ -274,8 +275,9 @@ impl ApprovalManager {
             return ApprovalRequirement::Approved;
         }
 
-        // A Telegram sale must not raise an approval card. The back-channel
-        // still asks for shell, file mutation, and vault payments.
+        // A customer channel and a headless procedure share this rule. A vend,
+        // a plugin tool, and a pin write proceed. Shell, file mutation, and
+        // vault payments still require a person.
         if self.non_interactive
             && self.non_interactive_shell_requires_approval
             && !channel_sale_still_asks(tool_name)

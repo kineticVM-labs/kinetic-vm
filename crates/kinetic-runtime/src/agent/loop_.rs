@@ -367,18 +367,16 @@ fn glob_match(pattern: &str, name: &str) -> bool {
 /// The approval manager an `agent::run` turn enforces, if any.
 ///
 /// An interactive run prompts the operator through the CLI. A headless SOP step
-/// turn has nobody to prompt, and it is the non-interactive run this entry point
-/// executes on an unattended trigger: cron, channel ingress, an approval
-/// resume. With no manager at all the approval gate reads every tool as not
-/// requiring approval, so a tool the owning agent's risk profile lists in
-/// `always_ask` ran unattended on exactly that surface. A headless step
-/// therefore gets the fail-closed non-interactive manager built from the owning
-/// agent's own profile: that policy still applies in full, and anything it would
-/// put in front of a person is denied because no person can answer. This is
-/// the same manager channel-driven turns already run under.
+/// — a keypad line, a boot signal, a cron tick — has nobody to prompt. It uses
+/// the same manager as a customer channel, built from the owning agent's risk
+/// profile. Routine tools, including a plugin's own tools and a pin write,
+/// proceed. `shell`, file mutation, and `vault_pay` still require a person, so
+/// they are denied when nobody can answer. `always_ask` still wins over that
+/// carve-out.
 ///
-/// Other non-interactive callers keep their existing behavior; this only closes
-/// the unattended SOP step surface.
+/// With no manager at all the approval gate treats every tool as not requiring
+/// approval, which would let an `always_ask` tool run unattended. Ordinary
+/// non-interactive callers that are not a headless step keep that behavior.
 fn run_approval_manager(
     interactive: bool,
     headless_sop_step: bool,
@@ -387,7 +385,9 @@ fn run_approval_manager(
     if interactive {
         Some(ApprovalManager::from_risk_profile(risk_profile))
     } else if headless_sop_step {
-        Some(ApprovalManager::for_non_interactive(risk_profile))
+        Some(ApprovalManager::for_non_interactive_backchannel(
+            risk_profile,
+        ))
     } else {
         None
     }
@@ -5619,6 +5619,133 @@ mod tests {
             plain.load(Ordering::SeqCst),
             1,
             "a tool the policy does not guard still runs under the fail-closed manager"
+        );
+    }
+
+    /// Quickstart's supervised profile asks before every tool that is not on
+    /// `auto_approve`. A keypad or boot procedure has nobody to ask, so that
+    /// default used to deny the device's own tools. The headless step uses the
+    /// customer-channel rule instead: a board tool runs, and shell still does
+    /// not, because nobody can approve it. `always_ask` remains a hard stop.
+    #[tokio::test]
+    async fn a_supervised_headless_step_runs_a_board_tool_and_denies_shell() {
+        let profile = kinetic_config::schema::RiskProfileConfig {
+            level: kinetic_config::policy::AutonomyLevel::Supervised,
+            ..kinetic_config::schema::RiskProfileConfig::default()
+        };
+        let manager = run_approval_manager(false, true, &profile)
+            .expect("a headless SOP step turn must carry an approval manager");
+        for tool in ["redeem_code", "gpio_write", "monad_attest"] {
+            assert_eq!(
+                manager.approval_requirement(tool),
+                crate::approval::ApprovalRequirement::Approved,
+                "{tool} is the device's own tool and must run with nobody present"
+            );
+        }
+        for tool in ["shell", "file_write", "file_edit", "vault_pay"] {
+            assert_eq!(
+                manager.approval_requirement(tool),
+                crate::approval::ApprovalRequirement::Prompt,
+                "{tool} still requires a person on a headless procedure"
+            );
+        }
+        let mut always_ask = profile.clone();
+        always_ask.always_ask = vec!["gpio_write".to_string()];
+        let asking = run_approval_manager(false, true, &always_ask)
+            .expect("always_ask still builds a headless manager");
+        assert_eq!(
+            asking.approval_requirement("gpio_write"),
+            crate::approval::ApprovalRequirement::Prompt,
+            "always_ask wins over the headless carve-out"
+        );
+
+        let turn_id = uuid::Uuid::new_v4().to_string();
+        let model_provider = ScriptedModelProvider::from_text_responses(vec![
+            r#"<tool_call>
+{"name":"gpio_write","arguments":{"value":"1"}}
+</tool_call>"#,
+            r#"<tool_call>
+{"name":"shell","arguments":{"value":"id"}}
+</tool_call>"#,
+            "done",
+        ]);
+        let pin = Arc::new(AtomicUsize::new(0));
+        let shell = Arc::new(AtomicUsize::new(0));
+        let tools_registry = crate::tools::scoped::ScopedToolRegistry::from_raw_for_test(vec![
+            Box::new(CountingTool::new("gpio_write", Arc::clone(&pin))),
+            Box::new(CountingTool::new("shell", Arc::clone(&shell))),
+        ]);
+        let mut history = vec![
+            ChatMessage::system("test-system"),
+            ChatMessage::user("run the step"),
+        ];
+        let observer = NoopObserver;
+
+        run_tool_call_loop(ToolLoop {
+            parent_agent_alias: None,
+            served_route_sink: None,
+            sop_reassembly: None,
+            exec: ResolvedAgentExecution {
+                model_access: ResolvedModelAccess {
+                    model_provider: &model_provider,
+                    provider_name: "mock-provider",
+                    model: "mock-model",
+                    dispatch_model: "mock-model",
+                    temperature: Some(0.0),
+                },
+                tools_registry: &tools_registry,
+                observer: &observer,
+                silent: true,
+                approval: Some(&manager),
+                multimodal_config: &kinetic_config::schema::MultimodalConfig::default(),
+                config: None,
+                max_tool_iterations: 4,
+                hooks: None,
+                excluded_tools: &[],
+                dedup_exempt_tools: &[],
+                activated_tools: None,
+                model_switch_callback: None,
+                pacing: &kinetic_config::schema::PacingConfig::default(),
+                strict_tool_parsing: false,
+                parallel_tools: false,
+                max_tool_result_chars: 0,
+                context_limits: test_context_limits(0),
+                context_limits_resolver: None,
+                receipt_generator: None,
+                knobs: &LoopKnobs::default(),
+                security: None,
+            },
+            history: &mut history,
+            history_has_trim_breadcrumb: &mut false,
+            injected_memory_preamble: &mut None,
+            channel_name: "sop",
+            channel_reply_target: None,
+            cancellation_token: None,
+            on_delta: None,
+            shared_budget: None,
+            channel: None,
+            collected_receipts: None,
+            event_tx: None,
+            steering: None,
+            new_messages_out: None,
+            image_cache: None,
+            memory: None,
+            ingress: IngressContext::sub_turn(),
+            agent_alias: None,
+            turn_id: &turn_id,
+        })
+        .await
+        .expect("the turn completes with shell denied");
+
+        assert_eq!(
+            pin.load(Ordering::SeqCst),
+            1,
+            "a board tool must run when the procedure has nobody to ask"
+        );
+        assert_eq!(
+            shell.load(Ordering::SeqCst),
+            0,
+            "shell must be denied before it runs when nobody can approve it"
         );
     }
 

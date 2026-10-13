@@ -531,7 +531,10 @@ output_price_per_million = 15.0
 [peripherals]
 enabled = true
 
-[agents]
+# Headless procedures run as this agent. vend_plugin sop/SOP.toml uses the
+# same name. A keypad press fails before any tool call when this block is missing.
+[agents.default]
+enabled = true
 
 [coordination]
 enabled = true

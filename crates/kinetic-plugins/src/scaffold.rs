@@ -241,6 +241,9 @@ const SOP_TOML: &str = r#"# Replace this procedure. It calls tools by name. The 
 name = "__PACKAGE__"
 description = "Replace this. The starter step calls ping."
 version = "0.1.0"
+# A board message has no chat turn. This procedure runs as agent "default".
+# The device config must contain [agents.default]. Rename both together.
+agent = "default"
 
 [[triggers]]
 type = "manual"
@@ -313,6 +316,7 @@ mod tests {
 
         let sop = fs::read_to_string(path.join("sop/SOP.toml")).expect("sop");
         assert!(sop.contains("name = \"sample_pkg\""));
+        assert!(sop.contains("agent = \"default\""));
         assert!(sop.contains("type = \"manual\""));
         assert!(sop.contains("# type = \"peripheral\""));
         assert!(sop.contains("# board = \"esp32\""));

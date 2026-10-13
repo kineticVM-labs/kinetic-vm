@@ -531,10 +531,9 @@ output_price_per_million = 15.0
 [peripherals]
 enabled = true
 
-# Headless procedures run as this agent. vend_plugin sop/SOP.toml uses the
-# same name. A keypad press fails before any tool call when this block is missing.
-[agents.default]
-enabled = true
+# `kinetic quickstart` creates [agents.device]. Headless procedures, including
+# vend_plugin sop/SOP.toml, run as that agent. Do not add a second agent here:
+# an enabled agent with no model and no risk profile stops channel startup.
 
 [coordination]
 enabled = true

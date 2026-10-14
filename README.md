@@ -1,6 +1,6 @@
 # KineticVM
 
-KineticVM: the physical world is AI's next dataset
+![KineticVM](web/public/og-home.png)
 
 **KineticVM gives physical AI an onchain identity and a wallet with spending limits, then records its work with onchain attestations, creating a provenance-backed history its owner can sell and buyers can verify without trusting the seller.**
 

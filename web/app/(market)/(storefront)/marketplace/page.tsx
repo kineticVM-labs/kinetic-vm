@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 
 export default async function MarketplacePage() {
   const listings = await listCatalog({ q: "", machine: "", sort: "rows" });
-  const trending = listings.slice(0, 4);
+  const trending = [...listings.filter((listing) => !listing.preview), ...listings.filter((listing) => listing.preview)].slice(0, 4);
   const recent = [...listings].sort((a, b) => b.createdAt - a.createdAt).slice(0, 4);
   const categories = MACHINE_TYPES.map((machine) => ({
     ...machine,
@@ -87,7 +87,7 @@ export default async function MarketplacePage() {
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink">Largest datasets</h2>
-            <p className="text-sm text-muted">Sorted by row count. Nothing here is a popularity score.</p>
+            <p className="text-sm text-muted">Live listings first, then the biggest files.</p>
           </div>
           <Link href="/marketplace/browse?sort=rows" className="text-sm font-medium text-ink underline decoration-lilac-strong underline-offset-4 hover:text-purple-deep">
             Browse all datasets

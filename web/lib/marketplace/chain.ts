@@ -45,7 +45,10 @@ const validationAbi = [
   },
 ] as const;
 
-const ZERO = "0x0000000000000000000000000000000000000000";
+const ZERO = "0x0000000000000000000000000000000000000000" as const;
+const READ_BATCH = 15;
+const BATCH_PAUSE_MS = 400;
+const READ_ATTEMPTS = 4;
 
 export type AgentOwnership = {
   owner: Address;
@@ -90,60 +93,118 @@ export async function walletOwnsAgent(wallet: Address, agentId: bigint): Promise
   return agent;
 }
 
+export type CheckedRow = {
+  index: number;
+  paramsHash: `0x${string}`;
+  requestHash: `0x${string}`;
+};
+
 /**
  * Every manifest row must be a score-100 validation from the Kinetic attestor,
  * and the response hash must be the line's params hash.
+ *
+ * Reads go one at a time. The public testnet RPC drops a burst of parallel
+ * calls, and that failure used to be reported as a missing attestation.
+ * A short pause after every 15 reads keeps the pace down, and a dropped call
+ * is retried before the row is treated as absent.
  */
-export async function confirmManifest(agentId: bigint, rows: ManifestRow[]): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function confirmManifest(
+  agentId: bigint,
+  rows: ManifestRow[],
+  onRow?: (row: CheckedRow) => void | Promise<void>,
+  signal?: AbortSignal,
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const validation = VALIDATION[MARKET_CHAIN_ID];
   const attestor = ATTESTOR[MARKET_CHAIN_ID];
   if (!validation || !attestor) return { ok: false, error: "The Kinetic attestor is not deployed on this chain." };
-  let failure: string | null = null;
-  let cursor = 0;
-  async function worker() {
-    for (;;) {
-      if (failure) return;
-      const index = cursor;
-      cursor += 1;
-      if (index >= rows.length) return;
-      const row = rows[index];
-      try {
-        const status = await client.readContract({
-          address: validation,
-          abi: validationAbi,
-          functionName: "getValidationStatus",
-          args: [row.requestHash],
-        });
-        const [validator, foundAgent, response, responseHash, tag] = status;
-        if (foundAgent !== agentId) {
-          failure = `Row ${index + 1} belongs to a different agent.`;
-          return;
-        }
-        if (!isAddressEqual(validator, attestor)) {
-          failure = `Row ${index + 1} was not attested by the Kinetic attestor.`;
-          return;
-        }
-        if (response !== 100) {
-          failure = `Row ${index + 1} is not a verified attestation.`;
-          return;
-        }
-        if (responseHash.toLowerCase() !== row.paramsHash.toLowerCase()) {
-          failure = `Row ${index + 1} does not match the attestation hash.`;
-          return;
-        }
-        if (tag && tag !== "kinetic-action") {
-          failure = `Row ${index + 1} has an unexpected attestation tag.`;
-          return;
-        }
-      } catch {
-        failure = `Row ${index + 1} has no attestation on Monad.`;
-      }
+  for (let index = 0; index < rows.length; index += 1) {
+    if (signal?.aborted) return { ok: false, error: "The check was cancelled." };
+    const row = rows[index];
+    let status;
+    try {
+      status = await readValidation(validation, row.requestHash, signal);
+    } catch (error) {
+      if (signal?.aborted) return { ok: false, error: "The check was cancelled." };
+      if (transientRpc(error)) return { ok: false, error: `Monad did not answer for row ${index + 1}. Try the check again.` };
+      return { ok: false, error: `Row ${index + 1} has no attestation on Monad.` };
+    }
+    const problem = attestProblem(index, status, agentId, attestor, row.paramsHash);
+    if (problem) return { ok: false, error: problem };
+    await onRow?.({ index: index + 1, paramsHash: row.paramsHash, requestHash: row.requestHash });
+    const finished = index + 1;
+    if (finished % READ_BATCH === 0 && finished < rows.length) await sleep(BATCH_PAUSE_MS, signal);
+  }
+  return { ok: true };
+}
+
+async function readValidation(validation: Address, requestHash: Hash, signal?: AbortSignal) {
+  let last: unknown;
+  for (let attempt = 0; attempt < READ_ATTEMPTS; attempt += 1) {
+    if (signal?.aborted) throw new Error("The check was cancelled.");
+    try {
+      return await client.readContract({
+        address: validation,
+        abi: validationAbi,
+        functionName: "getValidationStatus",
+        args: [requestHash],
+      });
+    } catch (error) {
+      last = error;
+      if (!transientRpc(error) || attempt === READ_ATTEMPTS - 1) throw error;
+      await sleep(BATCH_PAUSE_MS * (attempt + 1), signal);
     }
   }
-  const workers = Math.min(8, rows.length);
-  await Promise.all(Array.from({ length: workers }, () => worker()));
-  if (failure) return { ok: false, error: failure };
-  return { ok: true };
+  throw last;
+}
+
+function attestProblem(
+  index: number,
+  status: readonly [Address, bigint, number, Hash, string, bigint],
+  agentId: bigint,
+  attestor: Address,
+  paramsHash: string,
+): string | null {
+  const [validator, foundAgent, response, responseHash, tag] = status;
+  const row = index + 1;
+  if (isAddressEqual(validator, ZERO)) return `Row ${row} has no attestation on Monad.`;
+  if (foundAgent !== agentId) return `Row ${row} belongs to a different agent.`;
+  if (!isAddressEqual(validator, attestor)) return `Row ${row} was not attested by the Kinetic attestor.`;
+  if (response !== 100) return `Row ${row} is not a verified attestation.`;
+  if (responseHash.toLowerCase() !== paramsHash.toLowerCase()) return `Row ${row} does not match the attestation hash.`;
+  if (tag && tag !== "kinetic-action") return `Row ${row} has an unexpected attestation tag.`;
+  return null;
+}
+
+function transientRpc(error: unknown): boolean {
+  const text = errorText(error);
+  if (/rpc request failed|http request failed|timeout|fetch failed|econn|429|502|503|504|rate limit/i.test(text)) return true;
+  if (/reverted/i.test(text)) return false;
+  return true;
+}
+
+function errorText(error: unknown): string {
+  if (!error || typeof error !== "object") return String(error);
+  const record = error as { shortMessage?: unknown; message?: unknown; cause?: unknown };
+  const own = [record.shortMessage, record.message].filter((part) => typeof part === "string").join(" ");
+  return record.cause ? `${own} ${errorText(record.cause)}` : own;
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", finish);
+      resolve();
+    }, ms);
+    const finish = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    if (signal?.aborted) {
+      finish();
+      return;
+    }
+    signal?.addEventListener("abort", finish, { once: true });
+  });
 }
 
 export async function confirmPayment(input: {

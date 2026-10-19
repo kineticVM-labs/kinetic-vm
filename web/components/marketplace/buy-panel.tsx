@@ -3,7 +3,7 @@
 import { useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useChainId, useConnection, useSendTransaction, useSignMessage, useSwitchChain } from "wagmi";
 
 import { CheckIcon, CopyIcon } from "@/components/icons";
@@ -52,25 +52,29 @@ export function BuyPanel({
   const [shown, setShown] = useState(0);
   const [phase, setPhase] = useState<"idle" | "loading" | "playing" | "verified" | "ready" | "failed">("idle");
   const [pendingHash, setPendingHash] = useState<`0x${string}` | null>(null);
+  const listRef = useRef<HTMLUListElement>(null);
   const connected = connection.status === "connected" ? connection.address : undefined;
   const onChain = chainId === MARKET_CHAIN_ID;
   const working = busy || isPending || switching;
   const succeeded = phase === "verified" || phase === "ready";
-  const current = phase === "playing" && shown < rows.length ? rows[shown] : null;
-  const checked = succeeded || (rows.length > 0 && shown >= rows.length) ? rows.length : current ? shown + 1 : 0;
-  const progress = rows.length === 0 ? 0 : Math.min(rowCount, Math.round((checked / rows.length) * rowCount));
+  const checking = phase === "loading" || phase === "playing";
+  const revealed = phase === "playing" ? rows.slice(0, Math.min(rows.length, shown + 1)) : rows;
+  const matched = sample
+    ? rows.length === 0
+      ? 0
+      : Math.min(rowCount, Math.round((revealed.length / rows.length) * rowCount))
+    : succeeded
+      ? rowCount
+      : revealed.length;
 
   useEffect(() => {
-    if (phase !== "playing" || reduce || shown >= rows.length) return;
-    const timer = window.setTimeout(() => setShown((value) => value + 1), 420);
+    if (phase !== "playing" || reduce) return;
+    const timer = window.setTimeout(() => {
+      if (shown + 1 >= rows.length) setPhase("verified");
+      else setShown((value) => value + 1);
+    }, 420);
     return () => window.clearTimeout(timer);
   }, [phase, shown, rows.length, reduce]);
-
-  useEffect(() => {
-    if (phase !== "playing") return;
-    if (!reduce && shown < rows.length) return;
-    setPhase("verified");
-  }, [phase, reduce, shown, rows.length]);
 
   useEffect(() => {
     if (phase !== "verified") return;
@@ -78,25 +82,56 @@ export function BuyPanel({
     return () => window.clearTimeout(timer);
   }, [phase]);
 
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    list.scrollTop = list.scrollHeight;
+  }, [revealed.length, phase]);
+
   async function verify() {
+    if (phase === "loading" || phase === "playing") return;
     setError(null);
-    setPhase("loading");
-    try {
-      let next = checks;
-      if (!sample) {
-        const response = await fetch(`/api/marketplace/listings/${slug}/verify`, { method: "POST" });
-        const payload = (await response.json()) as { error?: string; rows?: CheckRow[] };
-        if (!response.ok || !payload.rows) throw new Error(payload.error ?? "Those rows did not verify.");
-        next = payload.rows;
-      }
-      if (next.length === 0) {
+    setShown(0);
+    if (sample) {
+      setRows(checks);
+      if (checks.length === 0) {
         setPhase("failed");
         setError("Those rows did not verify.");
         return;
       }
-      setRows(next);
-      setShown(0);
+      if (reduce) {
+        setShown(checks.length);
+        setPhase("verified");
+        return;
+      }
       setPhase("playing");
+      return;
+    }
+    setRows([]);
+    setPhase("loading");
+    try {
+      const response = await fetch(`/api/marketplace/listings/${slug}/verify`, { method: "POST" });
+      const type = response.headers.get("content-type") ?? "";
+      if (type.includes("application/json")) {
+        const payload = (await response.json()) as { error?: string; rows?: CheckRow[] };
+        if (!response.ok || !payload.rows || payload.rows.length === 0) {
+          throw new Error(payload.error ?? "Those rows did not verify.");
+        }
+        setRows(payload.rows);
+        setShown(0);
+        setPhase("playing");
+        return;
+      }
+      if (!response.ok || !response.body) throw new Error("Those rows did not verify.");
+      const failure = await readChecks(response.body, (row) => {
+        setRows((current) => [...current, row]);
+      });
+      if (failure) {
+        setPhase("failed");
+        setError(failure);
+        return;
+      }
+      setPhase("verified");
     } catch (cause) {
       setPhase("failed");
       setError(cause instanceof Error ? cause.message : "Those rows did not verify.");
@@ -174,31 +209,64 @@ export function BuyPanel({
         <div>
           <p className="text-sm leading-6 text-muted">The file stays sealed until the rows check out and Monad confirms payment.</p>
           {phase === "failed" ? (
-            <button type="button" className="btn btn-danger mt-4 w-full" disabled>
-              Did not verify
-            </button>
+            <div className="mt-4">
+              <p className="text-sm font-medium text-danger">Did not verify</p>
+              <button type="button" className="btn btn-primary mt-3 w-full" onClick={() => void verify()}>
+                Try again
+              </button>
+            </div>
           ) : phase === "verified" ? (
             <button type="button" className="btn btn-success mt-4 w-full" disabled>
               <CheckIcon width={16} height={16} />
               Verified
             </button>
           ) : phase === "ready" ? null : (
-            <button type="button" className="btn btn-primary mt-4 w-full" disabled={phase === "loading" || phase === "playing"} aria-busy={phase === "loading"} onClick={() => void verify()}>
+            <button
+              type="button"
+              className="btn btn-primary mt-4 w-full disabled:cursor-wait disabled:opacity-100"
+              disabled={checking}
+              aria-busy={checking}
+              onClick={() => void verify()}
+            >
+              {checking ? <Spinner /> : null}
               {phase === "loading" ? "Checking on Monad" : phase === "playing" ? "Checking rows" : "Verify data"}
             </button>
           )}
-          {phase === "playing" || succeeded ? (
+          {sample ? null : (
+            <p className="mt-3 text-xs leading-5 text-muted">
+              click{" "}
+              <a
+                href={`/api/marketplace/listings/${slug}/file?part=manifest`}
+                className="font-medium text-ink underline decoration-lilac-strong underline-offset-4 hover:text-purple-deep"
+              >
+                here
+              </a>{" "}
+              to download the manifest for manual verification
+            </p>
+          )}
+          {checking || phase === "failed" || succeeded ? (
             <div className="mt-4">
-              <p className={`font-mono text-xs ${succeeded ? "text-success" : "text-muted"}`}>
-                {formatRows(succeeded ? rowCount : progress)} / {formatRows(rowCount)} match
+              <p className={`font-mono text-xs ${succeeded ? "text-success" : "text-muted"}`} aria-live="polite">
+                {formatRows(matched)} / {formatRows(rowCount)} match
+                {phase === "loading" ? ` · checking row ${revealed.length + 1}` : ""}
               </p>
-              {current ? (
-                <p key={current.index} className="mt-3 flex items-center gap-2 text-sm text-ink" aria-live="polite">
-                  <CheckIcon width={16} height={16} className="shrink-0 text-success" />
-                  <span className="font-mono text-xs">
-                    Row {current.index} · {shortHash(current.paramsHash)}
-                  </span>
-                </p>
+              {revealed.length > 0 || phase === "loading" ? (
+                <ul ref={listRef} aria-label="Checked rows" className="mt-3 max-h-52 space-y-2 overflow-y-auto">
+                  {revealed.map((row) => (
+                    <li key={row.index} className="flex items-center gap-2 text-sm text-ink">
+                      <CheckIcon width={16} height={16} className="shrink-0 text-success" />
+                      <span className="font-mono text-xs">
+                        Row {row.index} · {shortHash(row.paramsHash)}
+                      </span>
+                    </li>
+                  ))}
+                  {phase === "loading" ? (
+                    <li className="flex items-center gap-2 text-sm text-muted">
+                      <Spinner />
+                      <span className="font-mono text-xs">Row {revealed.length + 1}</span>
+                    </li>
+                  ) : null}
+                </ul>
               ) : null}
               {sample && succeeded ? <p className="mt-3 text-sm leading-6 text-muted">Preview data, so these checks are the layout, not live attestations.</p> : null}
             </div>
@@ -251,6 +319,50 @@ function CidRow({ label, value, copied, onCopy }: { label: string; value: string
       </div>
     </div>
   );
+}
+
+function Spinner() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" className="animate-spin motion-reduce:animate-none" aria-hidden="true">
+      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeOpacity="0.35" strokeWidth="2.5" />
+      <path d="M20 12a8 8 0 0 0-8-8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+async function readChecks(body: ReadableStream<Uint8Array>, onRow: (row: CheckRow) => void): Promise<string | null> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let seen = 0;
+  let failure: string | null = null;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const chunks = buffer.split("\n\n");
+    buffer = chunks.pop() ?? "";
+    for (const chunk of chunks) {
+      const data = chunk
+        .split("\n")
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trim())
+        .join("");
+      if (!data) continue;
+      const event = JSON.parse(data) as { type?: string; error?: string; index?: number; paramsHash?: string; requestHash?: string };
+      if (event.type === "row" && event.index && event.paramsHash && event.requestHash) {
+        seen += 1;
+        onRow({ index: event.index, paramsHash: event.paramsHash, requestHash: event.requestHash });
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve());
+        });
+      } else if (event.type === "error") {
+        failure = event.error ?? "Those rows did not verify.";
+      }
+    }
+  }
+  if (failure) return failure;
+  return seen === 0 ? "Those rows did not verify." : null;
 }
 
 function shortHash(value: string): string {

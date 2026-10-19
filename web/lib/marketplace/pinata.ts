@@ -3,8 +3,15 @@ export function pinataConfigured(): boolean {
 }
 
 export function ipfsUrl(cid: string): string {
-  const gateway = process.env.PINATA_GATEWAY?.replace(/\/$/, "") || "https://gateway.pinata.cloud";
+  const configured = process.env.PINATA_GATEWAY?.trim().replace(/\/$/, "");
+  const gateway = configured ? withScheme(configured) : "https://gateway.pinata.cloud";
   return `${gateway}/ipfs/${cid}`;
+}
+
+/** A gateway host without a scheme cannot be fetched. */
+function withScheme(value: string): string {
+  if (/^https?:\/\//i.test(value)) return value;
+  return `https://${value}`;
 }
 
 export async function pinFile(name: string, bytes: Uint8Array, type: string): Promise<{ ok: true; cid: string } | { ok: false; error: string }> {
